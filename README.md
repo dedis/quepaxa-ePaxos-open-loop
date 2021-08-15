@@ -30,9 +30,8 @@ Do `git checkout epaxos-no-batching` to get the setup we used to get the results
 3. ![Identifying Master Server IP Screenshot](./README-images/Identifying%20Master%20Server%20IP.png)
 
 #### Modify Each Machine's Execution Script
-1. Inside ```epaxos.sh```, configure:
-    2. The experimental network IP address of all server machines, client machines, and the specific address of the server machine that will be the master.
-    
+Inside ```epaxos.sh```, configure the experimental network IP address of all server machines, client machines, and the specific address of the server machine that will be the master.
+
 ### Run
 1. Finally, run ```. epaxos.sh > run.txt``` on your master machine.
 2. If all works correctly, you should see n client logs inside the /logs directory in your master machine.
