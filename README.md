@@ -3,12 +3,6 @@
 1. 3 server machines
 2. 1 client machine
 
-### Switching Between Paxos  and EPaxos 
-#### Paxos
-Do `git checkout paxos-no-batching` to get the setup we used to get the results for Paxos  in Table 1. Then, follow the instructions down below.
-#### EPaxos
-Do `git checkout epaxos-no-batching` to get the setup we used to get the results for EPaxos  in Table 1. Then, follow the instructions down below.
-
 ### Installation (***For Each Machine***)
 1. Make sure Rabia is properly installed. Follow the instructions in the repo. This step is critical as it provides the go binary and python3.8 needed for testing.
 2. SSH into each of the VMs and do the following inside `~/go/src`:
@@ -21,6 +15,12 @@ Do `git checkout epaxos-no-batching` to get the setup we used to get the results
        ```Built Server```
        </br>
        ```Built Client```
+
+### Switching Between Paxos  and EPaxos 
+#### Paxos
+Do `git checkout paxos-no-batching` to get the setup we used to get the results for Paxos  in Table 1. Then, follow the instructions down below.
+#### EPaxos
+Do `git checkout epaxos-no-batching` to get the setup we used to get the results for EPaxos  in Table 1. Then, follow the instructions down below.
 
 ### Configure Machines
 
