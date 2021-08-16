@@ -8,6 +8,7 @@
 2. SSH into each of the VMs and do the following: 
     1. `cd ~/go/src`
     2. ```git clone https://github.com/zhouaea/epaxos.git && cd epaxos```
+    3. `git checkout paxos-no-batching` OR `git checkout epaxos-no-batching`
     4. ```. compile.sh```
     5. After compiling, you should see
        </br>
