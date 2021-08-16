@@ -5,8 +5,9 @@
 
 ### Installation (***For Each Machine***)
 1. Make sure Rabia is properly installed. Follow the instructions in the repo. This step is critical as it provides the go binary and python3.8 needed for testing.
-2. SSH into each of the VMs and do the following inside `~/go/src`:
-    1. ```git clone https://github.com/zhouaea/epaxos.git && cd epaxos```
+2. SSH into each of the VMs and do the following: 
+    1. `cd ~/go/src`
+    2. ```git clone https://github.com/zhouaea/epaxos.git && cd epaxos```
     4. ```. compile.sh```
     5. After compiling, you should see
        </br>
