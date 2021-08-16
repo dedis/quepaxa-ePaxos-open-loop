@@ -1,4 +1,5 @@
-# For non-root users... This is redundant if you're already sshing through root.
+source ./profile.sh
+
 function prepareRun() {
     for ip in "${ServerIps[@]}"
     do
@@ -122,7 +123,6 @@ function DownloadLogs() {
         scp -o StrictHostKeyChecking=no -i ${SSHKey} root@"$ip":${LogFolder}/*.out ${LogFolder} 2>&1 &
         sleep 0.3
     done
-    wait
 }
 
 function RemoveLogs(){
@@ -160,34 +160,14 @@ function Main() {
             runServersAndClientsAllMachines
             ;;
     esac
-    wait
 }
 
-function runOnce() {
-  if [ $# -ne 0 ]; then # if there's a profile passed in
-    . ${1}              # load it
-  fi
-
-  if [ $? -ne 0 ]; then # if there's an error
-    return 1            # early exit
-  fi
-
-  Main
-  DownloadLogs
-  EpKillAll
-}
-
-ProfilesToRun=(~/go/src/epaxos/profile0.sh ~/go/src/epaxos/profile1.sh ~/go/src/epaxos/profile2.sh ~/go/src/epaxos/profile3.sh ~/go/src/epaxos/profile4.sh ~/go/src/epaxos/profile5.sh ~/go/src/epaxos/profile6.sh ~/go/src/epaxos/profile7.sh ~/go/src/epaxos/profile8.sh)
-
-function runMultiple() {
-  for profile in ${ProfilesToRun[@]}
-  do
-    runOnce $profile
-    wait
-  done
-}
-
-#RemoveLogs
-#runOnce ~/go/src/epaxos/profile0.sh
-runMultiple
-
+#SendEPaxosFolder
+#prepareRun;
+RemoveLogs
+wait
+Main
+wait
+DownloadLogs
+wait
+EpKillAll
