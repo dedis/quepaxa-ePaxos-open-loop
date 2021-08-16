@@ -168,10 +168,10 @@ if __name__ == '__main__':
         if len(infos) != 0:
             for k, v in infos[0].items():
                 if len(v) > 1 and not isinstance(v, list):
-                    print(v[1], end=", ")
+                    print(k + ":", v[1], end=", ")
             print()
     for info in infos:
         for k, v in info.items():
             if len(v) > 1 and not isinstance(v, list):
-                print(v[0], end=", ")
+                print(k + ":", v[0], end=", ")
         print()
