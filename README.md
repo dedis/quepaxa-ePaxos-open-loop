@@ -51,7 +51,7 @@ Inside `profile.sh` or `profile0.sh` (depending on the branch) in each machine, 
 
 ## Run
 1. Finally, run `. runPaxos.sh` or `. runEPaxos.sh` (depending on the branch) on your master machine only. You should see a relatively constant flow of messages in your terminal.
-   1. Some of our results, namely those done for *Figure 4* or *Varying Data Size*, require multiple experiments to be run with a varying number of clients. For these experiments, we provide 9 profiles, where `profile0.sh` runs 20 clients, while `profile8.sh` runs 500 clients. To change which profile is being executed, change the first line of either `runPaxos.sh` or `runEPaxos.sh` to execute your desired profile. By default, `profile0.sh` will be executed. 
+   1. Some of our results, namely those done for *Figure 4* or *Varying Data Size*, require multiple experiments to be run with a varying number of clients. For these experiments, we provide 9 profiles, where `profile0.sh` runs 20 clients, while `profile8.sh` runs 500 clients. To change which profile is being executed, change the first line of either `runPaxos.sh` or `runEPaxos.sh` on **each machine** to execute your desired profile. By default, `profile0.sh` will be executed. 
 2. If all works correctly, there will be n client logs inside the /logs directory in your master machine.
 3. For throughput/latency analysis, run:
     1. ```python3.8 analysis.py ./logs```
