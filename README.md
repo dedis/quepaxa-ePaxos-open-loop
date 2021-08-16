@@ -40,5 +40,14 @@ Inside ```epaxos.sh```, configure the experimental network IP address of all ser
 2. If all works correctly, there will be n client logs inside the /logs directory in your master machine.
 3. For throughput/latency analysis, run:
     1. ```python3.8 analysis.py ./logs```
-    2. This will output a variety of different statistics. You can find the relevant statistics as `clientp50Latency: x`, `clientp99Latency: x`, `throughput: x`
+    2. If you get the error below, you didn't supply `./logs` as an argument
+       ```bash
+       Traceback (most recent call last):
+            File "analysis.py", line 164, in <module>
+              infos, disconnects = analysis_epaxos_logs()
+            File "analysis.py", line 100, in analysis_epaxos_logs
+              params = get_experiments(argv[1])
+       IndexError: list index out of range
+       ```
+    3. If successfuly, this will output a variety of different statistics. You can find the relevant statistics as `clientp50Latency: x`, `clientp99Latency: x`, `throughput: x`
 .    
