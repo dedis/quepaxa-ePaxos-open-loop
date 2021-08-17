@@ -18,7 +18,7 @@
        </br>
        ```Built Client```
 
-## Switching Between Paxos and EPaxos and Configurations 
+## Switching Between Paxos and EPaxos Configurations 
 For your convenience, we have created branches preloaded with the configurations we used for each experiment mentioned in the paper. 
 
 In each machine, `git checkout` into your desired branch. Compile go binaries on each machine with `. compile.sh`. Then, follow the instructions below, starting from *Configure Machines*.
