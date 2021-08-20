@@ -1,7 +1,7 @@
 # Testing EPaxos and Paxos in Cloudlab
 ## Experiment Setup
 1. 3 server machines
-2. 1 client machine
+2. 3 client machine
 
 ## Installation (***For Each Machine***)
 1. Make sure Rabia is properly installed. Follow the instructions in the repo. This step is critical as it provides the go binary and python3.8 needed for testing.
@@ -47,7 +47,7 @@ In each machine, `git checkout` into your desired branch. Compile go binaries on
 ![Identifying Master Server IP Screenshot](./README-images/Identifying%20Master%20Server%20IP.png)
 
 ### Modify Each Machine's Execution Script
-Inside `profile.sh` or `profile0.sh` (depending on the branch) in each machine, configure the experimental network IP address of all server machines in the `ServerIps` array, client machines in the `ClientIps` array, and the server machine that will be the leader in the `MasterIP` variable.
+Inside `base-profile.sh` in each machine, configure the experimental network IP address of all server machines in the `ServerIps` array, client machines in the `ClientIps` array, and the server machine that will be the leader in the `MasterIP` variable.
 
 ## Run
 1. Finally, run `. runPaxos.sh` or `. runEPaxos.sh` (depending on the branch) on your master machine only. You should see a relatively constant flow of messages in your terminal.
