@@ -1,7 +1,7 @@
 # Testing EPaxos and Paxos in Cloudlab
 ## Experiment Setup
 1. 3 server machines
-2. 3 client machine
+2. 1 client machine
 
 ## Installation (***For Each Machine***)
 1. Make sure Rabia is properly installed. Follow the instructions in the repo. This step is critical as it provides the go binary and python3.8 needed for testing.
