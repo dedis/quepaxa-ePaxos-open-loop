@@ -140,7 +140,7 @@ func (c *Client) waitReplies(readers []*bufio.Reader) {
 			for true {
 				reply := new(genericsmrproto.ProposeReplyTS)
 				if err := reply.Unmarshal(readers[local_i]); err != nil {
-					fmt.Println("connection broken:", err)
+					// fmt.Println("connection broken:", err)
 					break
 				}
 				//fmt.Println(reply.Value)
@@ -322,6 +322,7 @@ func (c *Client) processOneReply(rep *genericsmrproto.ProposeReplyTS) {
 	c.CommandLog[rep.CommandId].ReceiveTime = time.Now()
 	c.CommandLog[rep.CommandId].Duration = c.CommandLog[rep.CommandId].ReceiveTime.Sub(c.CommandLog[rep.CommandId].SendTime)
 	c.ReceivedSoFar += 1
+	// fmt.Print(fmt.Sprintf("$v", rep), "\n")
 }
 /*
 	converts int[] to float64[]
