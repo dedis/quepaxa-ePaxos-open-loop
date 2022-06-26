@@ -63,7 +63,7 @@ type Client struct {
 
 	master *rpc.Client // master/controller
 	leader int         // current leader index
-	receivChan chan genericsmrproto.ProposeReplyTS
+	receivChan chan *genericsmrproto.ProposeReplyTS
 }
 
 /*
@@ -78,7 +78,7 @@ func ClientInit(arrivalRate int) *Client {
 		leader: *defaultReplica,
 		SentSoFar:       0,
 		ReceivedSoFar:   0,
-		receivChan:      make(chan genericsmrproto.ProposeReplyTS, 1000000),
+		receivChan:      make(chan *genericsmrproto.ProposeReplyTS, 1000000),
 	}
 
 	pid := os.Getpid()
@@ -184,7 +184,7 @@ func (c *Client) OpenLoopClient() {
 				_ = <-c.arrivalChan // keep collecting new requests arrivals
 				numRequests++
 			}
-			c.sendOneRequest(id)
+			c.sendOneRequest(int32(id))
 			id = id + *clientBatchSize
 		}
 	}()
@@ -246,9 +246,9 @@ func (c *Client) generateArrivalTimes() {
 	sends a batch of requests.
 
 */
-func (c *Client) sendOneRequest(id int) {
+func (c *Client) sendOneRequest(id int32) {
 
-	for len(c.CommandLog) <= id+1000**clientBatchSize { // create new entries
+	for int32(len(c.CommandLog)) <= id+int32(1000**clientBatchSize) { // create new entries
 		c.CommandLog = append(c.CommandLog, CmdLog{
 			SendTime:    time.Time{},
 			ReceiveTime: time.Time{},
@@ -315,14 +315,14 @@ func (c *Client) sendOneRequest(id int) {
 /*
 	process on received reply
 */
-func (c *Client) processOneReply(rep genericsmrproto.ProposeReplyTS) {
+func (c *Client) processOneReply(rep *genericsmrproto.ProposeReplyTS) {
 	if c.CommandLog[rep.CommandId].Duration != time.Duration(0) {
 		panic("already received")
 	}
 	c.CommandLog[rep.CommandId].ReceiveTime = time.Now()
 	c.CommandLog[rep.CommandId].Duration = c.CommandLog[rep.CommandId].ReceiveTime.Sub(c.CommandLog[rep.CommandId].SendTime)
 	c.ReceivedSoFar += 1
-
+}
 /*
 	converts int[] to float64[]
 */
@@ -357,7 +357,7 @@ func (c *Client) writeToLog() {
 
 	medianLatency, _ := stats.Median(c.getFloat64List(latencyList))
 	percentile99, _ := stats.Percentile(c.getFloat64List(latencyList), 99.0) // tail latency
-	throughput := float64(len(latencyList)) / *float64(clientTimeout)
+	throughput := float64(len(latencyList)) / float64(*clientTimeout)
 	errorRate := (noResponses) * 100 / totalRequests
 
 
@@ -393,10 +393,10 @@ func main() {
 	client.OpenLoopClient()
 	client.writeToLog()	
 
-	for _, client := range c.servers {
-		if client != nil {
-			client.Close()
+	for _, conn := range client.servers {
+		if conn != nil {
+			conn.Close()
 		}
 	}
-	c.master.Close()
+	client.master.Close()
 }
