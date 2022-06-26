@@ -2,59 +2,107 @@ package main
 
 import (
 	"bufio"
-	"dlog"
 	"flag"
 	"fmt"
 	"genericsmrproto"
 	"log"
 	"masterproto"
+	"math"
 	"math/rand"
 	"net"
 	"net/rpc"
+	"os"
 	"runtime"
 	"state"
 	"time"
+
+	"github.com/montanaflynn/stats"
 )
 
+/*
+	input variables
+*/
+
 var masterAddr *string = flag.String("maddr", "", "Master address. Defaults to localhost")
-var masterPort *int = flag.Int("mport", 7087, "Master port.  Defaults to 7077.")
-var reqsNb *int = flag.Int("q", 5000, "Total number of requests. Defaults to 5000.")
+var masterPort *int = flag.Int("mport", 7087, "Master port.  Defaults to 7087.")
 var writes *int = flag.Int("w", 100, "Percentage of updates (writes). Defaults to 100%.")
-var noLeader *bool = flag.Bool("e", false, "Egalitarian (no leader). Defaults to false.")
-var fast *bool = flag.Bool("f", false, "Fast Paxos: send message directly to all replicas. Defaults to false.")
-var rounds *int = flag.Int("r", 1, "Split the total number of requests into this many rounds, and do rounds sequentially. Defaults to 1.")
+var leader *bool = flag.Bool("l", false, "EPaxos (no leader: false). Paxos: true.")
 var procs *int = flag.Int("p", 2, "GOMAXPROCS. Defaults to 2")
-var check = flag.Bool("check", false, "Check that every expected reply was received exactly once.")
-var eps *int = flag.Int("eps", 0, "Send eps more messages per round than the client will wait for (to discount stragglers). Defaults to 0.")
-var conflicts *int = flag.Int("c", -1, "Percentage of conflicts. Defaults to 0%")
-var s = flag.Float64("s", 2, "Zipfian s parameter")
-var v = flag.Float64("v", 1, "Zipfian v parameter")
+var conflicts *int = flag.Int("c", 0, "Percentage of conflicts. Defaults to 0%")
+var arrivalRate *int = flag.Int("arrivalRate", 1000, "Arrival Rate in requests per second. Defaults to 1000")
+var clientBatchSize *int = flag.Int("clientBatchSize", 50, "client batch size")
+var clientTimeout *int = flag.Int("clientTimeout", 60, "test duration in seconds")
+var defaultReplica *int = flag.Int("defaultReplica", 0, "default replica for Epaxos")
 
-var N int
+/*
+	A clients sends one or more requests (i.e., DB read or write operations) at a time, we note down the send time and
+	receive time in the following data structure
+*/
+type CmdLog struct {
+	SendTime    time.Time     // the send time of this client-batched command
+	ReceiveTime time.Time     // the receive time of client-batched command
+	Duration    time.Duration // the calculate latency of this command (ReceiveTime - SendTime)
+	Sent        bool          // whether this slot is sent or not
+}
 
-var successful []int
+/*
+	A EPaxos client
+*/
+type Client struct {
+	N                        int // number of replicas
+	CommandLog               []CmdLog // command log
+	SentSoFar, ReceivedSoFar int
 
-var rarray []int
-var rsp []bool
+	arrivalRate     int        // requests per second poisson rate as specified
+	arrivalTimeChan chan int64 // channel which stores the new arrival times
+	arrivalChan     chan bool  // channel that triggers new open loop requests
 
+	servers []net.Conn      // replica connections
+	readers []*bufio.Reader // replica readers
+	writers []*bufio.Writer // replica writers
 
+	master *rpc.Client // master/controller
+	leader int         // current leader index
+	receivChan chan genericsmrproto.ProposeReplyTS
+}
 
-func main() {
-	flag.Parse()
-
-	runtime.GOMAXPROCS(*procs)
-
-	randObj := rand.New(rand.NewSource(42))
-	zipf := rand.NewZipf(randObj, *s, *v, uint64(*reqsNb / *rounds + *eps))
-
-	if *conflicts > 100 {
-		log.Fatalf("Conflicts percentage must be between 0 and 100.\n")
+/*
+	Initialize a EPaxos client
+*/
+func ClientInit(arrivalRate int) *Client {
+	c := &Client{
+		CommandLog:      make([]CmdLog, 0),
+		arrivalRate:     arrivalRate,
+		arrivalTimeChan: make(chan int64, 1000000),
+		arrivalChan:     make(chan bool, 100000),
+		leader: *defaultReplica,
+		SentSoFar:       0,
+		ReceivedSoFar:   0,
+		receivChan:      make(chan genericsmrproto.ProposeReplyTS, 1000000),
 	}
 
+	pid := os.Getpid()
+	fmt.Printf("initialized client with process id: %v \n", pid)
+
+	return c
+}
+
+/*
+	1. connect the master, connect to the set of replicas
+	2. start the response listener
+	3. start the failure detector
+*/
+func (c *Client) Prologue() {
+
+	runtime.GOMAXPROCS(*procs)
+ 
 	master, err := rpc.DialHTTP("tcp", fmt.Sprintf("%s:%d", *masterAddr, *masterPort))
+
 	if err != nil {
 		log.Fatalf("Error connecting to master\n")
 	}
+
+	c.master = master
 
 	rlReply := new(masterproto.GetReplicaListReply)
 	err = master.Call("Master.GetReplicaList", new(masterproto.GetReplicaListArgs), rlReply)
@@ -62,205 +110,293 @@ func main() {
 		log.Fatalf("Error making the GetReplicaList RPC")
 	}
 
-	N = len(rlReply.ReplicaList)
-	servers := make([]net.Conn, N)
-	readers := make([]*bufio.Reader, N)
-	writers := make([]*bufio.Writer, N)
+	c.N = len(rlReply.ReplicaList)
+	c.servers = make([]net.Conn, c.N)
+	c.readers = make([]*bufio.Reader, c.N)
+	c.writers = make([]*bufio.Writer, c.N)
 
-	rarray = make([]int, *reqsNb / *rounds + *eps)
-	karray := make([]int64, *reqsNb / *rounds + *eps)
-	put := make([]bool, *reqsNb / *rounds + *eps)
-	perReplicaCount := make([]int, N)
-	test := make([]int, *reqsNb / *rounds + *eps)
-	for i := 0; i < len(rarray); i++ {
-		r := rand.Intn(N)
-		rarray[i] = r
-		if i < *reqsNb / *rounds {
-			perReplicaCount[r]++
-		}
-
-		if *conflicts >= 0 {
-			r = rand.Intn(100)
-			if r < *conflicts {
-				karray[i] = 42
-			} else {
-				karray[i] = int64(43 + i)
-			}
-			r = rand.Intn(100)
-			if r < *writes {
-				put[i] = true
-			} else {
-				put[i] = false
-			}
-		} else {
-			karray[i] = int64(zipf.Uint64())
-			test[karray[i]]++
-		}
-	}
-	if *conflicts >= 0 {
-		fmt.Println("Uniform distribution")
-	} else {
-		fmt.Println("Zipfian distribution:")
-		//fmt.Println(test[0:100])
-	}
-
-	for i := 0; i < N; i++ {
+	for i := 0; i < c.N; i++ {
 		var err error
-		servers[i], err = net.Dial("tcp", rlReply.ReplicaList[i])
+		c.servers[i], err = net.Dial("tcp", rlReply.ReplicaList[i])
 		if err != nil {
 			log.Printf("Error connecting to replica %d\n", i)
 		}
-		readers[i] = bufio.NewReader(servers[i])
-		writers[i] = bufio.NewWriter(servers[i])
+		c.readers[i] = bufio.NewReader(c.servers[i])
+		c.writers[i] = bufio.NewWriter(c.servers[i])
 	}
 
-	successful = make([]int, N)
-	leader := 0
+	c.waitReplies(c.readers)
+	c.failureDetector()
+}
 
-	if *noLeader == false {
-		reply := new(masterproto.GetLeaderReply)
-		if err = master.Call("Master.GetLeader", new(masterproto.GetLeaderArgs), reply); err != nil {
-			log.Fatalf("Error making the GetLeader RPC\n")
+/*
+	listen to all readers and upon receiving a response add it to the receive channel
+*/
+
+func (c *Client) waitReplies(readers []*bufio.Reader) {
+
+	for i := 0; i < len(readers); i++ {
+		go func(local_i int) {
+			for true {
+				reply := new(genericsmrproto.ProposeReplyTS)
+				if err := reply.Unmarshal(readers[local_i]); err != nil {
+					fmt.Println("connection broken:", err)
+					break
+				}
+				//fmt.Println(reply.Value)
+				c.receivChan <- reply
+
+			}
+		}(i)
+	}
+}
+
+/*
+	periodically check the current leader
+*/
+
+func (c *Client) failureDetector() {
+	go func() {
+		for true {
+			reply := new(masterproto.GetLeaderReply)
+			if err := c.master.Call("Master.GetLeader", new(masterproto.GetLeaderArgs), reply); err != nil {
+				log.Fatalf("Error making the GetLeader RPC\n")
+			}
+			c.leader = reply.LeaderId
+			time.Sleep(2 * time.Second)
 		}
-		leader = reply.LeaderId
-		log.Printf("The leader is replica %d\n", leader)
+	}()
+}
+
+/*
+	The main body of an open-loop client.
+*/
+
+func (c *Client) OpenLoopClient() {
+
+	c.generateArrivalTimes()
+
+	go func() {
+		id := 0 // request number
+		for true {
+			numRequests := 0
+			for !(numRequests == *clientBatchSize) {
+				_ = <-c.arrivalChan // keep collecting new requests arrivals
+				numRequests++
+			}
+			c.sendOneRequest(id)
+			id = id + *clientBatchSize
+		}
+	}()
+
+	go func() {
+		for true {
+			rep := <-c.receivChan
+			c.processOneReply(rep)
+		}
+	}()
+
+	c.startScheduler()                       // this runs in the main loop
+	time.Sleep(10 * time.Second)             // for inflight requests
+	time.Sleep(time.Duration(rand.Intn(10))) // a hack to avoid clients finishing at the same time
+}
+
+/*
+	until the test duration is arrived, fetch new arrivals and inform the request generator thread
+*/
+
+func (c *Client) startScheduler() {
+	start := time.Now()
+
+	for time.Now().Sub(start).Nanoseconds() < int64(*clientTimeout*1000*1000*1000) { // run until test completion
+		nextArrivalTime := <-c.arrivalTimeChan
+
+		for time.Now().Sub(start).Nanoseconds() < nextArrivalTime {
+			// busy waiting until the time to dispatch this request arrives
+		}
+		c.arrivalChan <- true
+	}
+}
+
+/*
+	generates poisson arrival times
+*/
+
+func (c *Client) generateArrivalTimes() {
+	go func() {
+		lambda := float64(c.arrivalRate) / (1000.0 * 1000.0 * 1000.0) // requests per nano second
+		arrivalTime := 0.0
+
+		for true {
+			// Get the next probability value from Uniform(0,1)
+			p := rand.Float64()
+
+			//Plug it into the inverse of the CDF of Exponential(_lamnbda)
+			interArrivalTime := -1 * (math.Log(1.0-p) / lambda)
+
+			// Add the inter-arrival time to the running sum
+			arrivalTime = arrivalTime + interArrivalTime
+
+			c.arrivalTimeChan <- int64(arrivalTime)
+		}
+	}()
+}
+
+/*
+	sends a batch of requests.
+
+*/
+func (c *Client) sendOneRequest(id int) {
+
+	for len(c.CommandLog) <= id+1000**clientBatchSize { // create new entries
+		c.CommandLog = append(c.CommandLog, CmdLog{
+			SendTime:    time.Time{},
+			ReceiveTime: time.Time{},
+			Duration:    0,
+			Sent:        false,
+		})
 	}
 
-	var id int32 = 0
-	done := make(chan bool, N)
+	c.SentSoFar += *clientBatchSize
+
 	args := genericsmrproto.Propose{id, state.Command{state.PUT, 0, 0}, 0}
 
-	before_total := time.Now()
-
-	for j := 0; j < *rounds; j++ {
-
-		n := *reqsNb / *rounds
-
-		if *check {
-			rsp = make([]bool, n)
-			for j := 0; j < n; j++ {
-				rsp[j] = false
-			}
+	for j := 0; j < *clientBatchSize; j++ {
+		args.CommandId = id
+		r := rand.Intn(100)
+		put_i := false
+		if r < *writes {
+			put_i = true
+		}
+		if put_i {
+			args.Command.Op = state.PUT
+		} else {
+			args.Command.Op = state.GET
 		}
 
-		if *noLeader {
-			for i := 0; i < N; i++ {
-				go waitReplies(readers, i, perReplicaCount[i], done)
+		r = rand.Intn(100)
+		karray_i := int64(43 + id)
+		if r < *conflicts {
+			karray_i = 42
+		}
+
+		args.Command.K = state.Key(karray_i)
+		args.Command.V = state.Value(id)
+		//args.Timestamp = time.Now().UnixNano()
+
+		cur_leader := -1
+
+		if *leader == true {
+			// paxos
+			cur_leader = c.leader
+			for cur_leader >= c.N {
+				cur_leader = c.leader
 			}
 		} else {
-			go waitReplies(readers, leader, n, done)
+			// epaxos
+			cur_leader = *defaultReplica
 		}
 
-		before := time.Now()
+		c.writers[cur_leader].WriteByte(genericsmrproto.PROPOSE)
+		args.Marshal(c.writers[cur_leader])
 
-		for i := 0; i < n+*eps; i++ {
-			dlog.Printf("Sending proposal %d\n", id)
-			args.CommandId = id
-			if put[i] {
-				args.Command.Op = state.PUT
-			} else {
-				args.Command.Op = state.GET
-			}
-			args.Command.K = state.Key(karray[i])
-			args.Command.V = state.Value(i)
-			//args.Timestamp = time.Now().UnixNano()
-			if !*fast {
-				if *noLeader {
-					leader = rarray[i]
-				}
-				writers[leader].WriteByte(genericsmrproto.PROPOSE)
-				args.Marshal(writers[leader])
-			} else {
-				//send to everyone
-				for rep := 0; rep < N; rep++ {
-					writers[rep].WriteByte(genericsmrproto.PROPOSE)
-					args.Marshal(writers[rep])
-					writers[rep].Flush()
-				}
-			}
-			//fmt.Println("Sent", id)
-			id++
-			if i%100 == 0 {
-				for i := 0; i < N; i++ {
-					writers[i].Flush()
-				}
-			}
-		}
-		for i := 0; i < N; i++ {
-			writers[i].Flush()
-		}
+		//fmt.Println("Sent", id)
+		
+		c.CommandLog[id].SendTime = time.Now()
+		c.CommandLog[id].Sent = true
+		id++
+	}
+	for j := 0; j < c.N; j++ {
+		c.writers[j].Flush()
+	}
 
-		err := false
-		if *noLeader {
-			for i := 0; i < N; i++ {
-				e := <-done
-				err = e || err
-			}
-		} else {
-			err = <-done
-		}
+}
 
-		after := time.Now()
-		fmt.Printf("Round took %v\n", after.Sub(before))
+/*
+	process on received reply
+*/
+func (c *Client) processOneReply(rep genericsmrproto.ProposeReplyTS) {
+	if c.CommandLog[rep.CommandId].Duration != time.Duration(0) {
+		panic("already received")
+	}
+	c.CommandLog[rep.CommandId].ReceiveTime = time.Now()
+	c.CommandLog[rep.CommandId].Duration = c.CommandLog[rep.CommandId].ReceiveTime.Sub(c.CommandLog[rep.CommandId].SendTime)
+	c.ReceivedSoFar += 1
 
-		if *check {
-			for j := 0; j < n; j++ {
-				if !rsp[j] {
-					fmt.Println("Didn't receive", j)
-				}
-			}
-		}
+/*
+	converts int[] to float64[]
+*/
 
-		if err {
-			if *noLeader {
-				N = N - 1
-			} else {
-				reply := new(masterproto.GetLeaderReply)
-				master.Call("Master.GetLeader", new(masterproto.GetLeaderArgs), reply)
-				leader = reply.LeaderId
-				log.Printf("New leader is replica %d\n", leader)
+func (c *Client) getFloat64List(list []int64) []float64 {
+	var array []float64
+	for i := 0; i < len(list); i++ {
+		array = append(array, float64(list[i]))
+	}
+	return array
+}
+
+/*
+	calculate stats
+*/
+func (c *Client) writeToLog() {
+
+	var latencyList []int64 // contains the time duration spent for each successful request in micro seconds
+	noResponses := 0        // number of requests for which no response was received
+	totalRequests := 0      // total number of requests sent
+
+	for i := 0; i < len(c.CommandLog); i++ {
+		if c.CommandLog[i].Sent == true { // if this slot was used before
+			if c.CommandLog[i].Duration != 0 { // if we got a response
+				latencyList = c.addValueNToArrayMTimes(latencyList, c.CommandLog[i].Duration.Microseconds(), 1)
+			} else { // no response
+				noResponses += *clientBatchSize
 			}
+			totalRequests += *clientBatchSize
 		}
 	}
 
-	after_total := time.Now()
-	fmt.Printf("Test took %v\n", after_total.Sub(before_total))
+	medianLatency, _ := stats.Median(c.getFloat64List(latencyList))
+	percentile99, _ := stats.Percentile(c.getFloat64List(latencyList), 99.0) // tail latency
+	throughput := float64(len(latencyList)) / *float64(clientTimeout)
+	errorRate := (noResponses) * 100 / totalRequests
 
-	s := 0
-	for _, succ := range successful {
-		s += succ
+
+	fmt.Printf("  Total Sent Requests:= %v ", c.SentSoFar)
+	fmt.Printf("  Total Received Responses:= %v   ", c.ReceivedSoFar)
+	fmt.Printf("  Throughput (successfully committed requests) := %v requests per second  ", throughput)
+	fmt.Printf("  Median Latency := %v micro seconds per request ", medianLatency)
+	fmt.Printf("  99 pecentile latency := %v micro seconds per request ", percentile99)
+	fmt.Printf("  Error Rate := %v \n", float64(errorRate))
+}
+
+/*
+	Add value N to list, M times
+*/
+
+func (c *Client) addValueNToArrayMTimes(list []int64, N int64, M int) []int64 {
+	for i := 0; i < M; i++ {
+		list = append(list, N)
 	}
+	return list
+}
 
-	fmt.Printf("Successful: %d\n", s)
+/*
+	main thread of the client
+*/
 
-	for _, client := range servers {
+func main() {
+	flag.Parse()
+	 
+	client := ClientInit(*arrivalRate)
+
+	client.Prologue()
+	client.OpenLoopClient()
+	client.writeToLog()	
+
+	for _, client := range c.servers {
 		if client != nil {
 			client.Close()
 		}
 	}
-	master.Close()
-}
-
-func waitReplies(readers []*bufio.Reader, leader int, n int, done chan bool) {
-	e := false
-
-	reply := new(genericsmrproto.ProposeReplyTS)
-	for i := 0; i < n; i++ {
-		if err := reply.Unmarshal(readers[leader]); err != nil {
-			fmt.Println("Error when reading:", err)
-			e = true
-			continue
-		}
-		//fmt.Println(reply.Value)
-		if *check {
-			if rsp[reply.CommandId] {
-				fmt.Println("Duplicate reply", reply.CommandId)
-			}
-			rsp[reply.CommandId] = true
-		}
-		if reply.OK != 0 {
-			successful[leader]++
-		}
-	}
-	done <- e
+	c.master.Close()
 }
