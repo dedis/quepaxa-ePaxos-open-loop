@@ -49,7 +49,7 @@ type CmdLog struct {
 	A EPaxos client
 */
 type Client struct {
-	N                        int // number of replicas
+	N                        int      // number of replicas
 	CommandLog               []CmdLog // command log
 	SentSoFar, ReceivedSoFar int
 
@@ -61,8 +61,8 @@ type Client struct {
 	readers []*bufio.Reader // replica readers
 	writers []*bufio.Writer // replica writers
 
-	master *rpc.Client // master/controller
-	leader int         // current leader index
+	master     *rpc.Client // master/controller
+	leader     int         // current leader index
 	receivChan chan *genericsmrproto.ProposeReplyTS
 }
 
@@ -75,7 +75,7 @@ func ClientInit(arrivalRate int) *Client {
 		arrivalRate:     arrivalRate,
 		arrivalTimeChan: make(chan int64, 1000000),
 		arrivalChan:     make(chan bool, 100000),
-		leader: *defaultReplica,
+		leader:          *defaultReplica,
 		SentSoFar:       0,
 		ReceivedSoFar:   0,
 		receivChan:      make(chan *genericsmrproto.ProposeReplyTS, 1000000),
@@ -95,7 +95,7 @@ func ClientInit(arrivalRate int) *Client {
 func (c *Client) Prologue() {
 
 	runtime.GOMAXPROCS(*procs)
- 
+
 	master, err := rpc.DialHTTP("tcp", fmt.Sprintf("%s:%d", *masterAddr, *masterPort))
 
 	if err != nil {
@@ -162,7 +162,10 @@ func (c *Client) failureDetector() {
 			if err := c.master.Call("Master.GetLeader", new(masterproto.GetLeaderArgs), reply); err != nil {
 				log.Fatalf("Error making the GetLeader RPC\n")
 			}
-			c.leader = reply.LeaderId
+			if c.leader != reply.LeaderId {
+				c.leader = reply.LeaderId
+				fmt.Printf("changed the leader to %v", c.leader)
+			}
 			time.Sleep(2 * time.Second)
 		}
 	}()
@@ -301,7 +304,7 @@ func (c *Client) sendOneRequest(id int32) {
 		args.Marshal(c.writers[cur_leader])
 
 		//fmt.Println("Sent", id)
-		
+
 		c.CommandLog[id].SendTime = time.Now()
 		c.CommandLog[id].Sent = true
 		id++
@@ -361,12 +364,11 @@ func (c *Client) writeToLog() {
 	throughput := float64(len(latencyList)) / float64(*clientTimeout)
 	errorRate := (noResponses) * 100 / totalRequests
 
-
-	fmt.Printf("  Total Sent Requests:= %v ", c.SentSoFar)
-	fmt.Printf("  Total Received Responses:= %v   ", c.ReceivedSoFar)
-	fmt.Printf("  Throughput (successfully committed requests) := %v requests per second  ", throughput)
-	fmt.Printf("  Median Latency := %v micro seconds per request ", medianLatency)
-	fmt.Printf("  99 pecentile latency := %v micro seconds per request ", percentile99)
+	fmt.Printf("  Total Sent Requests:= %v \n", c.SentSoFar)
+	fmt.Printf("  Total Received Responses:= %v    \n", c.ReceivedSoFar)
+	fmt.Printf("  Throughput (successfully committed requests) := %v requests per second   \n", throughput)
+	fmt.Printf("  Median Latency := %v micro seconds per request  \n", medianLatency)
+	fmt.Printf("  99 pecentile latency := %v micro seconds per request  \n", percentile99)
 	fmt.Printf("  Error Rate := %v \n", float64(errorRate))
 }
 
@@ -387,12 +389,12 @@ func (c *Client) addValueNToArrayMTimes(list []int64, N int64, M int) []int64 {
 
 func main() {
 	flag.Parse()
-	 
+
 	client := ClientInit(*arrivalRate)
 
 	client.Prologue()
 	client.OpenLoopClient()
-	client.writeToLog()	
+	client.writeToLog()
 
 	for _, conn := range client.servers {
 		if conn != nil {
