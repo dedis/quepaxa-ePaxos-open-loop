@@ -2,7 +2,7 @@ To build the project
 
 1. set ```GOPATH=/tmp/epaxos``` 
 2. ```GO111MODULE=off```
-3. ```cd src/server; go build -o server . ; cd ../ ; cd src/master; go build -o master . ; cd ../ ; cd src/client; go build -o client . ; cd ../```
+3. ```cd src/server; go build -o server . ; cd ../.. ; cd src/master; go build -o master . ; cd ../.. ; cd src/client; go build -o client . ; cd ../..```
 
 To run the 3 replica expiement
 
