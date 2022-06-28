@@ -68,9 +68,9 @@ type Client struct {
 	leader     int         // current leader index
 	receivChan chan *genericsmrproto.ProposeReplyTS
 
-	name string
+	name        string
 	logFilePath string
-	startTime time.Time
+	startTime   time.Time
 }
 
 /*
@@ -86,9 +86,9 @@ func ClientInit(arrivalRate int, logFilePath string, name string) *Client {
 		SentSoFar:       0,
 		ReceivedSoFar:   0,
 		receivChan:      make(chan *genericsmrproto.ProposeReplyTS, 1000000),
-		name:name,
-		logFilePath: logFilePath,
-		startTime: time.Now(),
+		name:            name,
+		logFilePath:     logFilePath,
+		startTime:       time.Now(),
 	}
 
 	pid := os.Getpid()
@@ -338,6 +338,7 @@ func (c *Client) processOneReply(rep *genericsmrproto.ProposeReplyTS) {
 	c.ReceivedSoFar += 1
 	// fmt.Print(fmt.Sprintf("$v", rep), "\n")
 }
+
 /*
 	converts int[] to float64[]
 */
@@ -381,7 +382,7 @@ func (c *Client) writeToLog() {
 	medianLatency, _ := stats.Median(c.getFloat64List(latencyList))
 	percentile99, _ := stats.Percentile(c.getFloat64List(latencyList), 99.0) // tail latency
 	throughput := float64(len(latencyList)) / float64(*clientTimeout)
-	errorRate := (noResponses) * 100 / totalRequests
+	errorRate := (totalRequests - noResponses) * 100 / totalRequests
 
 	fmt.Printf("\nTotal Sent Requests:= %v \n", c.SentSoFar)
 	fmt.Printf("Total Received Responses:= %v    \n", c.ReceivedSoFar)
