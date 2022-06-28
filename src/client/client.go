@@ -382,7 +382,7 @@ func (c *Client) writeToLog() {
 	medianLatency, _ := stats.Median(c.getFloat64List(latencyList))
 	percentile99, _ := stats.Percentile(c.getFloat64List(latencyList), 99.0) // tail latency
 	throughput := float64(len(latencyList)) / float64(*clientTimeout)
-	errorRate := (totalRequests - noResponses) * 100 / totalRequests
+	errorRate := (noResponses) * 100 / totalRequests
 
 	fmt.Printf("\nTotal Sent Requests:= %v \n", c.SentSoFar)
 	fmt.Printf("Total Received Responses:= %v    \n", c.ReceivedSoFar)
