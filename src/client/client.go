@@ -14,6 +14,7 @@ import (
 	"os"
 	"runtime"
 	"state"
+	"strconv"
 	"time"
 
 	"github.com/montanaflynn/stats"
@@ -33,6 +34,8 @@ var arrivalRate *int = flag.Int("arrivalRate", 1000, "Arrival Rate in requests p
 var clientBatchSize *int = flag.Int("clientBatchSize", 50, "client batch size")
 var clientTimeout *int = flag.Int("clientTimeout", 60, "test duration in seconds")
 var defaultReplica *int = flag.Int("defaultReplica", 0, "default replica for Epaxos")
+var logFilePath *string = flag.String("logFilePath", "logs", "log file path")
+var name *string = flag.String("name", "4", "unique client name")
 
 /*
 	A clients sends one or more requests (i.e., DB read or write operations) at a time, we note down the send time and
@@ -64,12 +67,16 @@ type Client struct {
 	master     *rpc.Client // master/controller
 	leader     int         // current leader index
 	receivChan chan *genericsmrproto.ProposeReplyTS
+
+	name string
+	logFilePath string
+	startTime time.Time
 }
 
 /*
 	Initialize a EPaxos client
 */
-func ClientInit(arrivalRate int) *Client {
+func ClientInit(arrivalRate int, logFilePath string, name string) *Client {
 	c := &Client{
 		CommandLog:      make([]CmdLog, 0),
 		arrivalRate:     arrivalRate,
@@ -79,6 +86,9 @@ func ClientInit(arrivalRate int) *Client {
 		SentSoFar:       0,
 		ReceivedSoFar:   0,
 		receivChan:      make(chan *genericsmrproto.ProposeReplyTS, 1000000),
+		name:name,
+		logFilePath: logFilePath,
+		startTime: time.Now(),
 	}
 
 	pid := os.Getpid()
@@ -177,6 +187,7 @@ func (c *Client) failureDetector() {
 
 func (c *Client) OpenLoopClient() {
 
+	c.startTime = time.Now()
 	c.generateArrivalTimes()
 
 	go func() {
@@ -344,6 +355,13 @@ func (c *Client) getFloat64List(list []int64) []float64 {
 */
 func (c *Client) writeToLog() {
 
+	f, err := os.Create(c.logFilePath + c.name + ".txt") // log file
+	if err != nil {
+		fmt.Printf("Error creating the output log file")
+		log.Fatal(err)
+	}
+	defer f.Close()
+
 	var latencyList []int64 // contains the time duration spent for each successful request in micro seconds
 	noResponses := 0        // number of requests for which no response was received
 	totalRequests := 0      // total number of requests sent
@@ -352,10 +370,11 @@ func (c *Client) writeToLog() {
 		if c.CommandLog[i].Sent == true { // if this slot was used before
 			if c.CommandLog[i].Duration != 0 { // if we got a response
 				latencyList = c.addValueNToArrayMTimes(latencyList, c.CommandLog[i].Duration.Microseconds(), 1)
+				c.printRequest(i, c.CommandLog[i].SendTime.Sub(c.startTime).Microseconds(), c.CommandLog[i].ReceiveTime.Sub(c.startTime).Microseconds(), f)
 			} else { // no response
-				noResponses += *clientBatchSize
+				noResponses += 1
 			}
-			totalRequests += *clientBatchSize
+			totalRequests += 1
 		}
 	}
 
@@ -364,12 +383,20 @@ func (c *Client) writeToLog() {
 	throughput := float64(len(latencyList)) / float64(*clientTimeout)
 	errorRate := (noResponses) * 100 / totalRequests
 
-	fmt.Printf("  Total Sent Requests:= %v \n", c.SentSoFar)
-	fmt.Printf("  Total Received Responses:= %v    \n", c.ReceivedSoFar)
-	fmt.Printf("  Throughput (successfully committed requests) := %v requests per second   \n", throughput)
-	fmt.Printf("  Median Latency := %v micro seconds per request  \n", medianLatency)
-	fmt.Printf("  99 pecentile latency := %v micro seconds per request  \n", percentile99)
-	fmt.Printf("  Error Rate := %v \n", float64(errorRate))
+	fmt.Printf("\nTotal Sent Requests:= %v \n", c.SentSoFar)
+	fmt.Printf("Total Received Responses:= %v    \n", c.ReceivedSoFar)
+	fmt.Printf("Throughput (successfully committed requests) := %v requests per second   \n", throughput)
+	fmt.Printf("Median Latency := %v micro seconds per request  \n", medianLatency)
+	fmt.Printf("99 pecentile latency := %v micro seconds per request  \n", percentile99)
+	fmt.Printf("Error Rate := %v \n", float64(errorRate))
+}
+
+/*
+	Print a client request with arrival time and end time w.r.t test start time
+*/
+
+func (c *Client) printRequest(i int, startTime int64, endTime int64, f *os.File) {
+	_, _ = f.WriteString(strconv.FormatInt(int64(i), 10) + "," + strconv.Itoa(int(startTime)) + "," + strconv.Itoa(int(endTime)) + "\n")
 }
 
 /*
@@ -390,7 +417,7 @@ func (c *Client) addValueNToArrayMTimes(list []int64, N int64, M int) []int64 {
 func main() {
 	flag.Parse()
 
-	client := ClientInit(*arrivalRate)
+	client := ClientInit(*arrivalRate, *logFilePath, *name)
 
 	client.Prologue()
 	client.OpenLoopClient()
