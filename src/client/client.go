@@ -41,16 +41,18 @@ var name *string = flag.String("name", "4", "unique client name")
 	A clients sends one or more requests (i.e., DB read or write operations) at a time, we note down the send time and
 	receive time in the following data structure
 */
+
 type CmdLog struct {
-	SendTime    time.Time     // the send time of this client-batched command
-	ReceiveTime time.Time     // the receive time of client-batched command
-	Duration    time.Duration // the calculate latency of this command (ReceiveTime - SendTime)
+	SendTime    time.Time     // the send time of this client command
+	ReceiveTime time.Time     // the receive time of client  command
+	Duration    time.Duration // the calculated latency of this command (ReceiveTime - SendTime)
 	Sent        bool          // whether this slot is sent or not
 }
 
 /*
 	A EPaxos client
 */
+
 type Client struct {
 	N                        int      // number of replicas
 	CommandLog               []CmdLog // command log
@@ -76,6 +78,7 @@ type Client struct {
 /*
 	Initialize a EPaxos client
 */
+
 func ClientInit(arrivalRate int, logFilePath string, name string) *Client {
 	c := &Client{
 		CommandLog:      make([]CmdLog, 0),
@@ -210,9 +213,8 @@ func (c *Client) OpenLoopClient() {
 		}
 	}()
 
-	c.startScheduler()                       // this runs in the main loop
-	time.Sleep(10 * time.Second)             // for inflight requests
-	time.Sleep(time.Duration(rand.Intn(10))) // a hack to avoid clients finishing at the same time
+	c.startScheduler()           // this runs in the main loop
+	time.Sleep(10 * time.Second) // for inflight requests
 }
 
 /*
@@ -329,6 +331,7 @@ func (c *Client) sendOneRequest(id int32) {
 /*
 	process on received reply
 */
+
 func (c *Client) processOneReply(rep *genericsmrproto.ProposeReplyTS) {
 	if c.CommandLog[rep.CommandId].Duration != time.Duration(0) {
 		panic("already received")
@@ -354,6 +357,7 @@ func (c *Client) getFloat64List(list []int64) []float64 {
 /*
 	calculate stats
 */
+
 func (c *Client) writeToLog() {
 
 	f, err := os.Create(c.logFilePath + c.name + ".txt") // log file
