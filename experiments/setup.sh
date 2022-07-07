@@ -1,7 +1,9 @@
 #     1. Copy binaries to remote machine
 
+GOPATH=/home/pasindu/Documents/epaxos; GO111MODULE=off; cd src/master ; go build -o master .; mv master epaxos_master; cd ../.. ; cd src/server ; go build -o server .; mv server epaxos_server; cd ../.. ;  cd src/client ; go build -o client .; mv client epaxos_client; cd ../.. ; GO111MODULE=on
+
 reset_directory="rm -r /home/pasindu/epaxos; mkdir /home/pasindu/epaxos"
-kill_insstances="pkill server ; pkill client; pkill replica"
+kill_insstances="pkill epaxos_server ; pkill epaxos_client; pkill epaxos_replica"
 
 replica1=pasindu@dedis-140.icsil1.epfl.ch
 replica1_cert="/home/pasindu/Pictures/pasindu_rsa"
@@ -22,9 +24,9 @@ master=pasindu@dedis-149.icsil1.epfl.ch
 master_cert="/home/pasindu/Pictures/pasindu_rsa"
 
 
-local_server_path="src/master/server"
-local_master_path="src/master/master"
-local_client_path="src/client/client"
+local_server_path="/home/pasindu/Documents/epaxos/src/server/epaxos_server"
+local_master_path="/home/pasindu/Documents/epaxos/src/master/epaxos_master"
+local_client_path="/home/pasindu/Documents/epaxos/src/client/epaxos_client"
 
 replica_home_path="/home/pasindu/epaxos/"
 
