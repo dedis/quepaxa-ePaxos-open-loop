@@ -3,7 +3,7 @@ arrival=$1
 algo=$2
 leader=$3
 
-GOPATH=/home/pasindu/Documents/epaxos; GO111MODULE=off; cd master ; go build -o master .; cd .. ; cd server ; go build -o server .; cd .. ;  cd client ; go build -o client .; cd .. ; GO111MODULE=on
+GOPATH=/home/pasindu/Documents/epaxos; GO111MODULE=off; cd src/master ; go build -o master .; cd ../.. ; cd src/server ; go build -o server .; cd ../.. ;  cd src/client ; go build -o client .; cd ../.. ; GO111MODULE=on
 
 
 server_path="src/server/server"
@@ -27,9 +27,9 @@ sleep 10
  
 echo "Started master and 3 servers"
 
-nohup ./${ctl_path} -name 5  -maddr localhost -w 50  -c 50 "${leader}" -arrivalRate "${arrival}" -clientBatchSize 50 -clientTimeout 60 -defaultReplica 0 -logFilePath ${output_path} >${output_path}5.log &
-nohup ./${ctl_path} -name 6  -maddr localhost -w 50  -c 50 "${leader}" -arrivalRate "${arrival}" -clientBatchSize 50 -clientTimeout 60 -defaultReplica 1 -logFilePath ${output_path} >${output_path}6.log &
-      ./${ctl_path} -name 7  -maddr localhost -w 50  -c 50 "${leader}" -arrivalRate "${arrival}" -clientBatchSize 50 -clientTimeout 60 -defaultReplica 2 -logFilePath ${output_path} >${output_path}7.log
+nohup ./${ctl_path} -name 5  -maddr localhost -w 50  -c 50 -arrivalRate "${arrival}" -clientBatchSize 50 -clientTimeout 60 -defaultReplica 0 -logFilePath ${output_path}  "${leader}" >${output_path}5.log &
+nohup ./${ctl_path} -name 6  -maddr localhost -w 50  -c 50 -arrivalRate "${arrival}" -clientBatchSize 50 -clientTimeout 60 -defaultReplica 1 -logFilePath ${output_path}  "${leader}" >${output_path}6.log &
+      ./${ctl_path} -name 7  -maddr localhost -w 50  -c 50 -arrivalRate "${arrival}" -clientBatchSize 50 -clientTimeout 60 -defaultReplica 2 -logFilePath ${output_path}  "${leader}" >${output_path}7.log
 
 sleep 10
 
