@@ -23,6 +23,7 @@ var portnum *int = flag.Int("port", 7070, "Port # to listen on. Defaults to 7070
 var masterAddr *string = flag.String("maddr", "", "Master address. Defaults to localhost.")
 var masterPort *int = flag.Int("mport", 7087, "Master port.  Defaults to 7087.")
 var myAddr *string = flag.String("addr", "", "Server address (this machine). Defaults to localhost.")
+var doPaxos *bool = flag.Bool("pa", true, "Use Paxos as the replication protocol. Defaults to true.")
 var doMencius *bool = flag.Bool("m", false, "Use Mencius as the replication protocol. Defaults to false.")
 var doGpaxos *bool = flag.Bool("g", false, "Use Generalized Paxos as the replication protocol. Defaults to false.")
 var doEpaxos *bool = flag.Bool("e", false, "Use EPaxos as the replication protocol. Defaults to false.")
@@ -67,7 +68,7 @@ func main() {
 		log.Println("Starting Generalized Paxos replica...")
 		rep := gpaxos.NewReplica(replicaId, nodeList, *thrifty, *exec, *dreply)
 		rpc.Register(rep)
-	} else {
+	} else if *doPaxos {
 		log.Println("Starting classic Paxos replica...")
 		rep := paxos.NewReplica(replicaId, nodeList, *thrifty, *exec, *dreply, *durable)
 		rpc.Register(rep)
