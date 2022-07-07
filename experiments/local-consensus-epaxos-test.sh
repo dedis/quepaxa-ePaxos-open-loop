@@ -3,17 +3,17 @@ arrival=$1
 algo=$2
 leader=$3
 
-GOPATH=/home/pasindu/Documents/epaxos; GO111MODULE=off; cd src/master ; go build -o master .; cd ../.. ; cd src/server ; go build -o server .; cd ../.. ;  cd src/client ; go build -o client .; cd ../.. ; GO111MODULE=on
+GOPATH=/home/pasindu/Documents/epaxos; GO111MODULE=off; cd src/master ; go build -o master .; mv master epaxos_master; cd ../.. ; cd src/server ; go build -o server .; mv server epaxos_server; cd ../.. ;  cd src/client ; go build -o client .; mv client epaxos_client; cd ../.. ; GO111MODULE=on
 
 
-server_path="src/server/server"
-ctl_path="src/client/client"
-master_path="src/master/master"
+server_path="src/server/epaxos_server"
+ctl_path="src/client/epaxos_client"
+master_path="src/master/epaxos_master"
 output_path="logs/"
 
 rm -r ${output_path}; mkdir ${output_path}
 
-pkill server; pkill server; pkill server; pkill client; pkill client; pkill client; pkill master 
+pkill epaxos_server; pkill epaxos_server; pkill epaxos_server; pkill epaxos_client; pkill epaxos_client; pkill epaxos_client; pkill epaxos_master 
 
 echo "Killed previously running instances"
 
@@ -35,7 +35,7 @@ sleep 10
 
 echo "finished running clients"
 
-pkill server; pkill server; pkill server; pkill client; pkill client; pkill client; pkill master 
+pkill epaxos_server; pkill epaxos_server; pkill epaxos_server; pkill epaxos_client; pkill epaxos_client; pkill epaxos_client; pkill epaxos_master 
 
 echo "Killed instances"
 
