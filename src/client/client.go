@@ -388,8 +388,7 @@ func (c *Client) writeToLog() {
 	throughput := float64(len(latencyList)) / float64(*clientTimeout)
 	errorRate := (noResponses) * 100 / totalRequests
 
-	fmt.Printf("\nTotal Sent Requests:= %v \n", c.SentSoFar)
-	fmt.Printf("Total Received Responses:= %v    \n", c.ReceivedSoFar)
+	fmt.Printf("Total time := %v seconds\n", float64(*clientTimeout))
 	fmt.Printf("Throughput (successfully committed requests) := %v requests per second   \n", throughput)
 	fmt.Printf("Median Latency := %v micro seconds per request  \n", medianLatency)
 	fmt.Printf("99 pecentile latency := %v micro seconds per request  \n", percentile99)
