@@ -333,7 +333,7 @@ func (c *Client) sendOneRequest(id int32) {
 */
 
 func (c *Client) processOneReply(rep *genericsmrproto.ProposeReplyTS) {
-	if rep.CommandId >= 0 || rep.CommandId < len(c.CommandLog) {
+	if rep.CommandId >= 0 || int(rep.CommandId) < len(c.CommandLog) {
 		if c.CommandLog[rep.CommandId].Duration != time.Duration(0) {
 			panic("already received")
 		}
