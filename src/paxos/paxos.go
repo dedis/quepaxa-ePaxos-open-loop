@@ -383,11 +383,19 @@ func (r *Replica) handlePropose(propose *genericsmr.Propose) {
 		return
 	}
 
+	// if the current instance is not nil, and the state of the current instance is not committed, then put back the proposals to the ProposeChan
+
+	if r.instanceSpace[r.crtInstance] != nil && r.instanceSpace[r.crtInstance].status != COMMITTED {
+		r.ProposeChan <- propose
+		return
+	}
+
 	for r.instanceSpace[r.crtInstance] != nil {
 		r.crtInstance++
 	}
 
 	instNo := r.crtInstance
+	//fmt.Printf("New instance creation %d \n", instNo)
 	r.crtInstance++
 
 	batchSize := len(r.ProposeChan) + 1
@@ -510,6 +518,7 @@ func (r *Replica) handleCommit(commit *paxosproto.Commit) {
 	inst := r.instanceSpace[commit.Instance]
 
 	dlog.Printf("Committing instance %d\n", commit.Instance)
+	//fmt.Printf("Committing instance %d\n", commit.Instance)
 
 	if inst == nil {
 		r.instanceSpace[commit.Instance] = &Instance{
@@ -539,6 +548,7 @@ func (r *Replica) handleCommitShort(commit *paxosproto.CommitShort) {
 	inst := r.instanceSpace[commit.Instance]
 
 	dlog.Printf("Committing instance %d\n", commit.Instance)
+	//fmt.Printf("Committing instance %d\n", commit.Instance)
 
 	if inst == nil {
 		r.instanceSpace[commit.Instance] = &Instance{nil,
@@ -628,6 +638,7 @@ func (r *Replica) handleAcceptReply(areply *paxosproto.AcceptReply) {
 		if inst.lb.acceptOKs+1 > r.N>>1 {
 			inst = r.instanceSpace[areply.Instance]
 			inst.status = COMMITTED
+			//fmt.Printf("Committing instance %d\n", areply.Instance)
 			if inst.lb.clientProposals != nil && !r.Dreply {
 				// give client the all clear
 				for i := 0; i < len(inst.cmds); i++ {
