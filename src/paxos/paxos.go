@@ -439,6 +439,8 @@ func (r *Replica) handlePropose(propose *genericsmr.Propose) {
 			r.bcastAccept(instNo, r.defaultBallot, cmds)
 			dlog.Printf("Fast round for instance %d\n", instNo)
 		}
+	} else {
+		r.ProposeChan <- propose
 	}
 }
 

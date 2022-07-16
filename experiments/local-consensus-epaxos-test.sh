@@ -29,9 +29,9 @@ echo "Started master and 3 servers"
 
 nohup ./${ctl_path} -name 5  -maddr localhost -w 50  -c 50 -arrivalRate "${arrival}" -clientBatchSize 50 -clientTimeout 60 -defaultReplica 0 -logFilePath ${output_path}  "${leader}" >${output_path}5.log &
 nohup ./${ctl_path} -name 6  -maddr localhost -w 50  -c 50 -arrivalRate "${arrival}" -clientBatchSize 50 -clientTimeout 60 -defaultReplica 1 -logFilePath ${output_path}  "${leader}" >${output_path}6.log &
-      ./${ctl_path} -name 7  -maddr localhost -w 50  -c 50 -arrivalRate "${arrival}" -clientBatchSize 50 -clientTimeout 60 -defaultReplica 2 -logFilePath ${output_path}  "${leader}" >${output_path}7.log
+nohup ./${ctl_path} -name 7  -maddr localhost -w 50  -c 50 -arrivalRate "${arrival}" -clientBatchSize 50 -clientTimeout 60 -defaultReplica 2 -logFilePath ${output_path}  "${leader}" >${output_path}7.log &
 
-sleep 10
+sleep 130
 
 echo "finished running clients"
 
