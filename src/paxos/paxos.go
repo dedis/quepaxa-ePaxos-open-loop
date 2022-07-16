@@ -385,59 +385,60 @@ func (r *Replica) handlePropose(propose *genericsmr.Propose) {
 
 	// if the current instance is not nil, and the state of the current instance is not committed, then put back the proposals to the ProposeChan
 
-	if r.instanceSpace[r.crtInstance] != nil && r.instanceSpace[r.crtInstance].status != COMMITTED {
-		r.ProposeChan <- propose
-		return
-	}
+	if (r.crtInstance == 0 && r.instanceSpace[r.crtInstance] == nil) || (r.crtInstance >= 0 && r.instanceSpace[r.crtInstance].status == COMMITTED) {
 
-	for r.instanceSpace[r.crtInstance] != nil {
-		r.crtInstance++
-	}
+		instNo := int32(-1)
+		if r.crtInstance == 0 && r.instanceSpace[r.crtInstance] == nil {
+			instNo = 0
+		} else {
+			r.crtInstance++
+			instNo = r.crtInstance
+		}
 
-	instNo := r.crtInstance
-	//fmt.Printf("New instance creation %d \n", instNo)
-	r.crtInstance++
+		//fmt.Printf("New instance creation %d \n", instNo)
+		//r.crtInstance++
 
-	batchSize := len(r.ProposeChan) + 1
+		batchSize := len(r.ProposeChan) + 1
 
-	if batchSize > MAX_BATCH {
-		batchSize = MAX_BATCH
-	}
+		if batchSize > MAX_BATCH {
+			batchSize = MAX_BATCH
+		}
 
-	dlog.Printf("Batched %d\n", batchSize)
+		dlog.Printf("Batched %d\n", batchSize)
 
-	cmds := make([]state.Command, batchSize)
-	proposals := make([]*genericsmr.Propose, batchSize)
-	cmds[0] = propose.Command
-	proposals[0] = propose
+		cmds := make([]state.Command, batchSize)
+		proposals := make([]*genericsmr.Propose, batchSize)
+		cmds[0] = propose.Command
+		proposals[0] = propose
 
-	for i := 1; i < batchSize; i++ {
-		prop := <-r.ProposeChan
-		cmds[i] = prop.Command
-		proposals[i] = prop
-	}
+		for i := 1; i < batchSize; i++ {
+			prop := <-r.ProposeChan
+			cmds[i] = prop.Command
+			proposals[i] = prop
+		}
 
-	if r.defaultBallot == -1 {
-		r.instanceSpace[instNo] = &Instance{
-			cmds,
-			r.makeUniqueBallot(0),
-			PREPARING,
-			&LeaderBookkeeping{proposals, 0, 0, 0, 0}}
-		r.bcastPrepare(instNo, r.makeUniqueBallot(0), true)
-		dlog.Printf("Classic round for instance %d\n", instNo)
-	} else {
-		r.instanceSpace[instNo] = &Instance{
-			cmds,
-			r.defaultBallot,
-			PREPARED,
-			&LeaderBookkeeping{proposals, 0, 0, 0, 0}}
+		if r.defaultBallot == -1 {
+			r.instanceSpace[instNo] = &Instance{
+				cmds,
+				r.makeUniqueBallot(0),
+				PREPARING,
+				&LeaderBookkeeping{proposals, 0, 0, 0, 0}}
+			r.bcastPrepare(instNo, r.makeUniqueBallot(0), true)
+			dlog.Printf("Classic round for instance %d\n", instNo)
+		} else {
+			r.instanceSpace[instNo] = &Instance{
+				cmds,
+				r.defaultBallot,
+				PREPARED,
+				&LeaderBookkeeping{proposals, 0, 0, 0, 0}}
 
-		r.recordInstanceMetadata(r.instanceSpace[instNo])
-		r.recordCommands(cmds)
-		r.sync()
+			r.recordInstanceMetadata(r.instanceSpace[instNo])
+			r.recordCommands(cmds)
+			r.sync()
 
-		r.bcastAccept(instNo, r.defaultBallot, cmds)
-		dlog.Printf("Fast round for instance %d\n", instNo)
+			r.bcastAccept(instNo, r.defaultBallot, cmds)
+			dlog.Printf("Fast round for instance %d\n", instNo)
+		}
 	}
 }
 
