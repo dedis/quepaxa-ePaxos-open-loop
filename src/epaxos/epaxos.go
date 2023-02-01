@@ -160,7 +160,7 @@ func NewReplica(id int, peerAddrList []string, thrifty bool, exec bool, dreply b
 		r.conflicts[i] = make(map[state.Key]int32, HT_INIT_SIZE)
 	}
 
-	for bf_PT = 1; math.Pow(2, float64(bf_PT))/float64(MAX_BATCH) < BF_M_N; {
+	for bf_PT = 1; math.Pow(2, float64(bf_PT))/float64(r.batchSize) < BF_M_N; {
 		bf_PT++
 	}
 
@@ -801,7 +801,7 @@ func bfFromCommands(cmds []state.Command) *bloomfilter.Bloomfilter {
 func (r *Replica) handlePropose(propose *genericsmr.Propose) {
 	//TODO!! Handle client retries
 	if r.crtInstance[r.Id]-r.CommittedUpTo[r.Id] < int32(r.pipe) {
-
+		//fmt.Printf("current instance %v, committed upto %v\n", r.crtInstance[r.Id], r.CommittedUpTo[r.Id])
 		r.crtInstance[r.Id]++
 		instNo := r.crtInstance[r.Id]
 
@@ -831,6 +831,8 @@ func (r *Replica) handlePropose(propose *genericsmr.Propose) {
 		default:
 
 		}
+
+		//fmt.Printf("pushed back proposal\n")
 	}
 }
 

@@ -3,13 +3,16 @@ arrival=$1
 algo=$2
 leader=$3
 
-GOPATH=/home/pasindu/Documents/epaxos; GO111MODULE=off; cd src/master ; go build -o master .; mv master epaxos_master; cd ../.. ; cd src/server ; go build -o server .; mv server epaxos_server; cd ../.. ;  cd src/client ; go build -o client .; mv client epaxos_client; cd ../.. ; GO111MODULE=on
-
-
 server_path="src/server/epaxos_server"
 ctl_path="src/client/epaxos_client"
 master_path="src/master/epaxos_master"
 output_path="logs/"
+
+rm ${server_path}
+rm ${ctl_path}
+rm ${master_path}
+
+GOPATH=/home/pasindu/Documents/epaxos; GO111MODULE=off; cd src/master ; go build -o master .; mv master epaxos_master; cd ../.. ; cd src/server ; go build -o server .; mv server epaxos_server; cd ../.. ;  cd src/client ; go build -o client .; mv client epaxos_client; cd ../.. ; GO111MODULE=on
 
 rm -r ${output_path}; mkdir ${output_path}
 
@@ -19,9 +22,9 @@ echo "Killed previously running instances"
 
 nohup ./${master_path} -N 3 >${output_path}1.log &
 
-nohup ./${server_path} -port 7070 -maddr localhost --addr localhost -exec  -dreply "${algo}" -batchSize 500 -batchTime 2000 -pipeline 100 >${output_path}2.log &
-nohup ./${server_path} -port 7071 -maddr localhost --addr localhost -exec  -dreply "${algo}" -batchSize 500 -batchTime 2000 -pipeline 100 >${output_path}3.log &
-nohup ./${server_path} -port 7072 -maddr localhost --addr localhost -exec  -dreply "${algo}" -batchSize 500 -batchTime 2000 -pipeline 100 >${output_path}4.log &
+nohup ./${server_path} -port 7070 -maddr localhost --addr localhost -exec  -dreply "${algo}" -batchSize 2500 -batchTime 10 -pipeline 10 >${output_path}2.log &
+nohup ./${server_path} -port 7071 -maddr localhost --addr localhost -exec  -dreply "${algo}" -batchSize 2500 -batchTime 10 -pipeline 10 >${output_path}3.log &
+nohup ./${server_path} -port 7072 -maddr localhost --addr localhost -exec  -dreply "${algo}" -batchSize 2500 -batchTime 10 -pipeline 10 >${output_path}4.log &
  
 sleep 10
  

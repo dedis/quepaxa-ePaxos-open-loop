@@ -390,7 +390,7 @@ func (r *Replica) handlePropose(propose *genericsmr.Propose) {
 	// if the current instance is not nil, and the state of the current instance is not committed, then put back the proposals to the ProposeChan
 
 	if r.crtInstance-r.committedUpTo < int32(r.pipe) {
-
+		//fmt.Printf("current: %v, committed: %v\n", r.crtInstance, r.committedUpTo)
 		r.crtInstance++
 		instNo := r.crtInstance
 
@@ -445,7 +445,7 @@ func (r *Replica) handlePropose(propose *genericsmr.Propose) {
 		default:
 
 		}
-
+		//fmt.Printf("pushed back\n")
 	}
 }
 
