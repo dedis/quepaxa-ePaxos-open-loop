@@ -22,8 +22,6 @@ const FALSE = uint8(0)
 const DS = 5
 const ADAPT_TIME_SEC = 10
 
-const MAX_BATCH = 1000 // switch for testing original=1K
-
 const COMMIT_GRACE_PERIOD = 10 * 1e9 //10 seconds
 
 const BF_K = 4
@@ -74,6 +72,9 @@ type Replica struct {
 	latestCPInstance      int32
 	clientMutex           *sync.Mutex // for synchronizing when sending replies to clients from multiple go-routines
 	instancesToRecover    chan *instanceId
+	batchSize             int
+	batchTime             int
+	pipe                  int
 }
 
 type Instance struct {
@@ -118,7 +119,7 @@ type LeaderBookkeeping struct {
 	tpaOKs            int
 }
 
-func NewReplica(id int, peerAddrList []string, thrifty bool, exec bool, dreply bool, beacon bool, durable bool) *Replica {
+func NewReplica(id int, peerAddrList []string, thrifty bool, exec bool, dreply bool, beacon bool, durable bool, batchSize int, batchTime int, pipe int) *Replica {
 	r := &Replica{
 		genericsmr.NewReplica(id, peerAddrList, thrifty, exec, dreply),
 		make(chan fastrpc.Serializable, genericsmr.CHAN_BUFFER_SIZE),
@@ -144,14 +145,17 @@ func NewReplica(id int, peerAddrList []string, thrifty bool, exec bool, dreply b
 		0,
 		-1,
 		new(sync.Mutex),
-		make(chan *instanceId, genericsmr.CHAN_BUFFER_SIZE)}
+		make(chan *instanceId, genericsmr.CHAN_BUFFER_SIZE),
+		batchSize,
+		batchTime,
+		pipe}
 
 	r.Beacon = beacon
 	r.Durable = durable
 
 	for i := 0; i < r.N; i++ {
 		r.InstanceSpace[i] = make([]*Instance, 2*1024*1024)
-		r.crtInstance[i] = 0
+		r.crtInstance[i] = -1
 		r.ExecedUpTo[i] = -1
 		r.conflicts[i] = make(map[state.Key]int32, HT_INIT_SIZE)
 	}
@@ -230,7 +234,7 @@ var slowClockChan chan bool
 
 func (r *Replica) fastClock() {
 	for !r.Shutdown {
-		time.Sleep(1e6 * 5) // 0.1 ms
+		time.Sleep(time.Duration(r.batchTime) * time.Microsecond)
 		fastClockChan <- true
 	}
 }
@@ -289,8 +293,8 @@ func (r *Replica) run() {
 		r.UpdatePreferredPeerOrder(quorum)
 	}
 
-	slowClockChan = make(chan bool, 1)
-	fastClockChan = make(chan bool, 1)
+	slowClockChan = make(chan bool, 10)
+	fastClockChan = make(chan bool, 10)
 	go r.slowClock()
 	go r.fastClock()
 
@@ -700,8 +704,8 @@ func (r *Replica) updateConflicts(cmds []state.Command, replica int32, instance 
 				r.conflicts[replica][cmds[i].K] = instance
 			}
 		} else {
-            r.conflicts[replica][cmds[i].K] = instance
-        }
+			r.conflicts[replica][cmds[i].K] = instance
+		}
 		if s, present := r.maxSeqPerKey[cmds[i].K]; present {
 			if s < seq {
 				r.maxSeqPerKey[cmds[i].K] = seq
@@ -796,29 +800,38 @@ func bfFromCommands(cmds []state.Command) *bloomfilter.Bloomfilter {
 
 func (r *Replica) handlePropose(propose *genericsmr.Propose) {
 	//TODO!! Handle client retries
+	if r.crtInstance[r.Id]-r.CommittedUpTo[r.Id] < int32(r.pipe) {
 
-	batchSize := len(r.ProposeChan) + 1
-	if batchSize > MAX_BATCH {
-		batchSize = MAX_BATCH
+		r.crtInstance[r.Id]++
+		instNo := r.crtInstance[r.Id]
+
+		batchSize := len(r.ProposeChan) + 1
+		if batchSize > r.batchSize {
+			batchSize = r.batchSize
+		}
+
+		dlog.Printf("Starting instance %d\n", instNo)
+		dlog.Printf("Batching %d\n", batchSize)
+
+		cmds := make([]state.Command, batchSize)
+		proposals := make([]*genericsmr.Propose, batchSize)
+		cmds[0] = propose.Command
+		proposals[0] = propose
+		for i := 1; i < batchSize; i++ {
+			prop := <-r.ProposeChan
+			cmds[i] = prop.Command
+			proposals[i] = prop
+		}
+
+		r.startPhase1(r.Id, instNo, 0, proposals, cmds, batchSize)
+	} else {
+		select {
+		case r.ProposeChan <- propose:
+
+		default:
+
+		}
 	}
-
-	instNo := r.crtInstance[r.Id]
-	r.crtInstance[r.Id]++
-
-	dlog.Printf("Starting instance %d\n", instNo)
-	dlog.Printf("Batching %d\n", batchSize)
-
-	cmds := make([]state.Command, batchSize)
-	proposals := make([]*genericsmr.Propose, batchSize)
-	cmds[0] = propose.Command
-	proposals[0] = propose
-	for i := 1; i < batchSize; i++ {
-		prop := <-r.ProposeChan
-		cmds[i] = prop.Command
-		proposals[i] = prop
-	}
-
-	r.startPhase1(r.Id, instNo, 0, proposals, cmds, batchSize)
 }
 
 func (r *Replica) startPhase1(replica int32, instance int32, ballot int32, proposals []*genericsmr.Propose, cmds []state.Command, batchSize int) {
@@ -1268,7 +1281,13 @@ func (r *Replica) handleCommit(commit *epaxosproto.Commit) {
 			//someone committed a NO-OP, but we have proposals for this instance
 			//try in a different instance
 			for _, p := range inst.lb.clientProposals {
-				r.ProposeChan <- p
+				select {
+				case r.ProposeChan <- p:
+
+				default:
+
+				}
+
 			}
 			inst.lb = nil
 		}
@@ -1315,7 +1334,12 @@ func (r *Replica) handleCommitShort(commit *epaxosproto.CommitShort) {
 		if inst.lb != nil && inst.lb.clientProposals != nil {
 			//try command in a different instance
 			for _, p := range inst.lb.clientProposals {
-				r.ProposeChan <- p
+				select {
+				case r.ProposeChan <- p:
+
+				default:
+
+				}
 			}
 			inst.lb = nil
 		}
