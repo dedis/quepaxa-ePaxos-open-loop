@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const CHAN_BUFFER_SIZE = 200000
+const CHAN_BUFFER_SIZE = 2000000
 
 type RPCPair struct {
 	Obj  fastrpc.Serializable
@@ -298,7 +298,14 @@ func (r *Replica) clientListener(conn net.Conn) {
 			if err = prop.Unmarshal(reader); err != nil {
 				break
 			}
-			r.ProposeChan <- &Propose{prop, writer}
+
+			select {
+			case r.ProposeChan <- &Propose{prop, writer}:
+				//fmt.Println("Pushed a message to the channel")
+			default:
+				//fmt.Println("WARN: The channel is full")
+			}
+
 			break
 
 		case genericsmrproto.READ:

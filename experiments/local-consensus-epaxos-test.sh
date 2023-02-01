@@ -19,9 +19,9 @@ echo "Killed previously running instances"
 
 nohup ./${master_path} -N 3 >${output_path}1.log &
 
-nohup ./${server_path} -port 7070 -maddr localhost --addr localhost -exec  -dreply "${algo}" >${output_path}2.log &
-nohup ./${server_path} -port 7071 -maddr localhost --addr localhost -exec  -dreply "${algo}" >${output_path}3.log &
-nohup ./${server_path} -port 7072 -maddr localhost --addr localhost -exec  -dreply "${algo}" >${output_path}4.log &
+nohup ./${server_path} -port 7070 -maddr localhost --addr localhost -exec  -dreply "${algo}" -batchSize 500 -batchTime 2000 -pipeline 100 >${output_path}2.log &
+nohup ./${server_path} -port 7071 -maddr localhost --addr localhost -exec  -dreply "${algo}" -batchSize 500 -batchTime 2000 -pipeline 100 >${output_path}3.log &
+nohup ./${server_path} -port 7072 -maddr localhost --addr localhost -exec  -dreply "${algo}" -batchSize 500 -batchTime 2000 -pipeline 100 >${output_path}4.log &
  
 sleep 10
  

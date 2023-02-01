@@ -28,6 +28,9 @@ var doMencius *bool = flag.Bool("m", false, "Use Mencius as the replication prot
 var doGpaxos *bool = flag.Bool("g", false, "Use Generalized Paxos as the replication protocol. Defaults to false.")
 var doEpaxos *bool = flag.Bool("e", false, "Use EPaxos as the replication protocol. Defaults to false.")
 var procs *int = flag.Int("p", 2, "GOMAXPROCS. Defaults to 2")
+var batchSize *int = flag.Int("batchSize", 1, "batch size")
+var batchTime *int = flag.Int("batchTime", 1, "batch time in micro seconds")
+var pipe *int = flag.Int("pipeline", 1, "pipeline length")
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 var thrifty = flag.Bool("thrifty", false, "Use only as many messages as strictly required for inter-replica communication.")
 var exec = flag.Bool("exec", false, "Execute commands.")
@@ -70,7 +73,7 @@ func main() {
 		rpc.Register(rep)
 	} else if *doPaxos {
 		log.Println("Starting classic Paxos replica...")
-		rep := paxos.NewReplica(replicaId, nodeList, *thrifty, *exec, *dreply, *durable)
+		rep := paxos.NewReplica(replicaId, nodeList, *thrifty, *exec, *dreply, *durable, *batchSize, *batchTime, *pipe)
 		rpc.Register(rep)
 	}
 

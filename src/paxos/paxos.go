@@ -17,8 +17,6 @@ const CHAN_BUFFER_SIZE = 200000
 const TRUE = uint8(1)
 const FALSE = uint8(0)
 
-const MAX_BATCH = 5000
-
 type Replica struct {
 	*genericsmr.Replica // extends a generic Paxos replica
 	prepareChan         chan fastrpc.Serializable
@@ -41,6 +39,9 @@ type Replica struct {
 	counter             int
 	flush               bool
 	committedUpTo       int32
+	batchSize           int
+	batchTime           int
+	pipe                int
 }
 
 type InstanceStatus int
@@ -67,7 +68,7 @@ type LeaderBookkeeping struct {
 	nacks           int
 }
 
-func NewReplica(id int, peerAddrList []string, thrifty bool, exec bool, dreply bool, durable bool) *Replica {
+func NewReplica(id int, peerAddrList []string, thrifty bool, exec bool, dreply bool, durable bool, batchSize int, batchTime int, pipe int) *Replica {
 	r := &Replica{genericsmr.NewReplica(id, peerAddrList, thrifty, exec, dreply),
 		make(chan fastrpc.Serializable, genericsmr.CHAN_BUFFER_SIZE),
 		make(chan fastrpc.Serializable, genericsmr.CHAN_BUFFER_SIZE),
@@ -78,12 +79,15 @@ func NewReplica(id int, peerAddrList []string, thrifty bool, exec bool, dreply b
 		0, 0, 0, 0, 0, 0,
 		false,
 		make([]*Instance, 15*1024*1024),
-		0,
+		-1,
 		-1,
 		false,
 		0,
 		true,
-		-1}
+		-1,
+		batchSize,
+		batchTime,
+		pipe}
 
 	r.Durable = durable
 
@@ -155,7 +159,7 @@ var clockChan chan bool
 
 func (r *Replica) clock() {
 	for !r.Shutdown {
-		time.Sleep(1e6 * 5) // 5 ms
+		time.Sleep(time.Duration(r.batchTime) * time.Microsecond)
 		clockChan <- true
 	}
 }
@@ -178,7 +182,7 @@ func (r *Replica) run() {
 		r.IsLeader = true
 	}
 
-	clockChan = make(chan bool, 1)
+	clockChan = make(chan bool, 10)
 	go r.clock()
 
 	onOffProposeChan := r.ProposeChan
@@ -385,23 +389,18 @@ func (r *Replica) handlePropose(propose *genericsmr.Propose) {
 
 	// if the current instance is not nil, and the state of the current instance is not committed, then put back the proposals to the ProposeChan
 
-	if (r.crtInstance == 0 && r.instanceSpace[r.crtInstance] == nil) || (r.crtInstance >= 0 && r.instanceSpace[r.crtInstance].status == COMMITTED) {
+	if r.crtInstance-r.committedUpTo < int32(r.pipe) {
 
-		instNo := int32(-1)
-		if r.crtInstance == 0 && r.instanceSpace[r.crtInstance] == nil {
-			instNo = 0
-		} else {
-			r.crtInstance++
-			instNo = r.crtInstance
-		}
+		r.crtInstance++
+		instNo := r.crtInstance
 
 		//fmt.Printf("New instance creation %d \n", instNo)
 		//r.crtInstance++
 
 		batchSize := len(r.ProposeChan) + 1
 
-		if batchSize > MAX_BATCH {
-			batchSize = MAX_BATCH
+		if batchSize > r.batchSize {
+			batchSize = r.batchSize
 		}
 
 		dlog.Printf("Batched %d\n", batchSize)
@@ -440,7 +439,13 @@ func (r *Replica) handlePropose(propose *genericsmr.Propose) {
 			dlog.Printf("Fast round for instance %d\n", instNo)
 		}
 	} else {
-		r.ProposeChan <- propose
+		select {
+		case r.ProposeChan <- propose:
+
+		default:
+
+		}
+
 	}
 }
 
@@ -495,7 +500,13 @@ func (r *Replica) handleAccept(accept *paxosproto.Accept) {
 			//TODO: is this correct?
 			// try the proposal in a different instance
 			for i := 0; i < len(inst.lb.clientProposals); i++ {
-				r.ProposeChan <- inst.lb.clientProposals[i]
+
+				select {
+				case r.ProposeChan <- inst.lb.clientProposals[i]:
+
+				default:
+
+				}
 			}
 			inst.lb.clientProposals = nil
 		}
@@ -535,7 +546,13 @@ func (r *Replica) handleCommit(commit *paxosproto.Commit) {
 		r.instanceSpace[commit.Instance].ballot = commit.Ballot
 		if inst.lb != nil && inst.lb.clientProposals != nil {
 			for i := 0; i < len(inst.lb.clientProposals); i++ {
-				r.ProposeChan <- inst.lb.clientProposals[i]
+				select {
+				case r.ProposeChan <- inst.lb.clientProposals[i]:
+
+				default:
+
+				}
+
 			}
 			inst.lb.clientProposals = nil
 		}
@@ -563,7 +580,13 @@ func (r *Replica) handleCommitShort(commit *paxosproto.CommitShort) {
 		r.instanceSpace[commit.Instance].ballot = commit.Ballot
 		if inst.lb != nil && inst.lb.clientProposals != nil {
 			for i := 0; i < len(inst.lb.clientProposals); i++ {
-				r.ProposeChan <- inst.lb.clientProposals[i]
+				select {
+				case r.ProposeChan <- inst.lb.clientProposals[i]:
+
+				default:
+
+				}
+
 			}
 			inst.lb.clientProposals = nil
 		}
@@ -594,7 +617,13 @@ func (r *Replica) handlePrepareReply(preply *paxosproto.PrepareReply) {
 				// so we put the client proposal back in the queue so that
 				// we know to try it in another instance
 				for i := 0; i < len(inst.lb.clientProposals); i++ {
-					r.ProposeChan <- inst.lb.clientProposals[i]
+					select {
+					case r.ProposeChan <- inst.lb.clientProposals[i]:
+
+					default:
+
+					}
+
 				}
 				inst.lb.clientProposals = nil
 			}
@@ -620,7 +649,13 @@ func (r *Replica) handlePrepareReply(preply *paxosproto.PrepareReply) {
 			if inst.lb.clientProposals != nil {
 				// try the proposals in another instance
 				for i := 0; i < len(inst.lb.clientProposals); i++ {
-					r.ProposeChan <- inst.lb.clientProposals[i]
+
+					select {
+					case r.ProposeChan <- inst.lb.clientProposals[i]:
+
+					default:
+
+					}
 				}
 				inst.lb.clientProposals = nil
 			}
