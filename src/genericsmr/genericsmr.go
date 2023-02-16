@@ -302,8 +302,10 @@ func (r *Replica) clientListener(conn net.Conn) {
 			select {
 			case r.ProposeChan <- &Propose{prop, writer}:
 				//fmt.Println("Pushed a message to the channel")
+				break
 			default:
 				//fmt.Println("WARN: The channel is full")
+				break
 			}
 
 			break
