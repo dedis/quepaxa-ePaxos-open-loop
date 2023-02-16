@@ -31,9 +31,9 @@ sleep 10
  
 echo "Started master and 3 servers"
 
-nohup ./${ctl_path} -name 5  -maddr localhost -w 50  -c 50 -arrivalRate "${arrival}" -clientBatchSize "${batchSize}" -testDuration 60 -defaultReplica 0 -logFilePath ${output_path}  "${leader}" -leaderTimeout "${leaderTimeout}">${output_path}5.log &
-nohup ./${ctl_path} -name 6  -maddr localhost -w 50  -c 50 -arrivalRate "${arrival}" -clientBatchSize "${batchSize}" -testDuration 60 -defaultReplica 1 -logFilePath ${output_path}  "${leader}" -leaderTimeout "${leaderTimeout}">${output_path}6.log &
-nohup ./${ctl_path} -name 7  -maddr localhost -w 50  -c 50 -arrivalRate "${arrival}" -clientBatchSize "${batchSize}" -testDuration 60 -defaultReplica 2 -logFilePath ${output_path}  "${leader}" -leaderTimeout "${leaderTimeout}">${output_path}7.log &
+nohup ./${ctl_path} -name 5  -maddr localhost -w 50  -c 50 -arrivalRate "${arrival}" -clientBatchSize 50 -testDuration 60 -defaultReplica 0 -logFilePath ${output_path}  "${leader}" -leaderTimeout "${leaderTimeout}">${output_path}5.log &
+nohup ./${ctl_path} -name 6  -maddr localhost -w 50  -c 50 -arrivalRate "${arrival}" -clientBatchSize 50 -testDuration 60 -defaultReplica 1 -logFilePath ${output_path}  "${leader}" -leaderTimeout "${leaderTimeout}">${output_path}6.log &
+nohup ./${ctl_path} -name 7  -maddr localhost -w 50  -c 50 -arrivalRate "${arrival}" -clientBatchSize 50 -testDuration 60 -defaultReplica 2 -logFilePath ${output_path}  "${leader}" -leaderTimeout "${leaderTimeout}">${output_path}7.log &
 
 sleep 130
 
@@ -42,5 +42,9 @@ echo "finished running clients"
 pkill epaxos_server; pkill epaxos_server; pkill epaxos_server; pkill epaxos_client; pkill epaxos_client; pkill epaxos_client; pkill epaxos_master 
 
 echo "Killed instances"
+
+mkdir -p /home/pasindu/Desktop/epaxos/"${arrival}"/"${algo}"/"${leader}"/"${batchSize}"/"${batchTime}"/"${leaderTimeout}"/"${pipeline}"
+
+cp -r logs/ /home/pasindu/Desktop/epaxos/"${arrival}"/"${algo}"/"${leader}"/"${batchSize}"/"${batchTime}"/"${leaderTimeout}"/"${pipeline}"
 
 echo "Finish test"
