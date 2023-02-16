@@ -28,13 +28,13 @@ var masterAddr *string = flag.String("maddr", "", "Master address. Defaults to l
 var masterPort *int = flag.Int("mport", 7087, "Master port.  Defaults to 7087.")
 var writes *int = flag.Int("w", 100, "Percentage of updates (writes). Defaults to 100%.")
 var leader *bool = flag.Bool("l", false, "EPaxos (no leader: false). Paxos: true.")
-var procs *int = flag.Int("p", 2, "GOMAXPROCS. Defaults to 2")
+var procs *int = flag.Int("p", 8, "GOMAXPROCS. Defaults to 2")
 var conflicts *int = flag.Int("c", 0, "Percentage of conflicts. Defaults to 0%")
 var arrivalRate *int = flag.Int("arrivalRate", 1000, "Arrival Rate in requests per second. Defaults to 1000")
 var clientBatchSize *int = flag.Int("clientBatchSize", 50, "client batch size")
-var clientTimeout *int = flag.Int("clientTimeout", 60, "test duration in seconds")
+var testDuration *int = flag.Int("testDuration", 60, "test duration in seconds")
 var defaultReplica *int = flag.Int("defaultReplica", 0, "default replica for Epaxos")
-var logFilePath *string = flag.String("logFilePath", "logs", "log file path")
+var logFilePath *string = flag.String("logFilePath", "logs/", "log file path")
 var name *string = flag.String("name", "4", "unique client name")
 
 /*
@@ -82,12 +82,12 @@ type Client struct {
 func ClientInit(arrivalRate int, logFilePath string, name string) *Client {
 	c := &Client{
 		CommandLog:      make([]CmdLog, 0),
+		SentSoFar:       0,
+		ReceivedSoFar:   0,
 		arrivalRate:     arrivalRate,
 		arrivalTimeChan: make(chan int64, 1000000),
 		arrivalChan:     make(chan bool, 100000),
 		leader:          *defaultReplica,
-		SentSoFar:       0,
-		ReceivedSoFar:   0,
 		receivChan:      make(chan *genericsmrproto.ProposeReplyTS, 1000000),
 		name:            name,
 		logFilePath:     logFilePath,
@@ -179,7 +179,7 @@ func (c *Client) failureDetector() {
 				c.leader = reply.LeaderId
 				fmt.Printf("changed the leader to %v", c.leader)
 			}
-			time.Sleep(2 * time.Second)
+			time.Sleep(20 * time.Millisecond)
 		}
 	}()
 }
@@ -224,7 +224,7 @@ func (c *Client) OpenLoopClient() {
 func (c *Client) startScheduler() {
 	start := time.Now()
 
-	for time.Now().Sub(start).Nanoseconds() < int64(*clientTimeout*1000*1000*1000) { // run until test completion
+	for time.Now().Sub(start).Nanoseconds() < int64(*testDuration*1000*1000*1000) { // run until test completion
 		nextArrivalTime := <-c.arrivalTimeChan
 
 		for time.Now().Sub(start).Nanoseconds() < nextArrivalTime {
@@ -302,7 +302,7 @@ func (c *Client) sendOneRequest(id int32) {
 
 		cur_leader := -1
 
-		if *leader == true {
+		if *leader {
 			// paxos
 			cur_leader = c.leader
 			for cur_leader >= c.N {
@@ -387,10 +387,9 @@ func (c *Client) writeToLog() {
 
 	medianLatency, _ := stats.Median(c.getFloat64List(latencyList))
 	percentile99, _ := stats.Percentile(c.getFloat64List(latencyList), 99.0) // tail latency
-	throughput := float64(len(latencyList)) / float64(*clientTimeout)
+	throughput := float64(len(latencyList)) / float64(*testDuration)
 	errorRate := (noResponses) * 100 / totalRequests
 
-	fmt.Printf("Total time := %v seconds\n", float64(*clientTimeout))
 	fmt.Printf("Throughput (successfully committed requests) := %v requests per second   \n", throughput)
 	fmt.Printf("Median Latency := %v micro seconds per request  \n", medianLatency)
 	fmt.Printf("99 pecentile latency := %v micro seconds per request  \n", percentile99)
