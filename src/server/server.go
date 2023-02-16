@@ -55,7 +55,7 @@ func main() {
 		go catchKill(interrupt)
 	}
 
-	log.Printf("Server starting on port %d\n", *portnum)
+	log.Printf("Server starting on port number %d\n", *portnum)
 
 	replicaId, nodeList := registerWithMaster(fmt.Sprintf("%s:%d", *masterAddr, *masterPort))
 
