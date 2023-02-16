@@ -33,6 +33,7 @@ var conflicts *int = flag.Int("c", 0, "Percentage of conflicts. Defaults to 0%")
 var arrivalRate *int = flag.Int("arrivalRate", 1000, "Arrival Rate in requests per second. Defaults to 1000")
 var clientBatchSize *int = flag.Int("clientBatchSize", 50, "client batch size")
 var testDuration *int = flag.Int("testDuration", 60, "test duration in seconds")
+var leaderTimeout *int = flag.Int("leaderTimeout", 20000, "leader timeout in micro seconds")
 var defaultReplica *int = flag.Int("defaultReplica", 0, "default replica for Epaxos")
 var logFilePath *string = flag.String("logFilePath", "logs/", "log file path")
 var name *string = flag.String("name", "4", "unique client name")
@@ -179,7 +180,7 @@ func (c *Client) failureDetector() {
 				c.leader = reply.LeaderId
 				fmt.Printf("changed the leader to %v", c.leader)
 			}
-			time.Sleep(20 * time.Millisecond)
+			time.Sleep(time.Duration(*leaderTimeout) * time.Microsecond)
 		}
 	}()
 }

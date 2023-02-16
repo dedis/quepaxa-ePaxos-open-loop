@@ -15,6 +15,7 @@ import (
 
 var portnum *int = flag.Int("port", 7087, "Port # to listen on. Defaults to 7087")
 var numNodes *int = flag.Int("N", 3, "Number of replicas. Defaults to 3.")
+var leaderTimeout *int = flag.Int("leaderTimeout", 20000, "leader timeout in micro seconds")
 
 type Master struct {
 	N        int
@@ -79,7 +80,7 @@ func (master *Master) run() {
 	master.leader[0] = true
 
 	for true {
-		time.Sleep(3000 * 1000 * 1000)
+		time.Sleep(time.Duration(*leaderTimeout) * time.Microsecond)
 		new_leader := false
 		for i, node := range master.nodes {
 			err := node.Call("Replica.Ping", new(genericsmrproto.PingArgs), new(genericsmrproto.PingReply))
