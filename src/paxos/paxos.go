@@ -441,9 +441,9 @@ func (r *Replica) handlePropose(propose *genericsmr.Propose) {
 	} else {
 		select {
 		case r.ProposeChan <- propose:
-
+			break
 		default:
-
+			break
 		}
 		//fmt.Printf("pushed back\n")
 	}
@@ -503,9 +503,9 @@ func (r *Replica) handleAccept(accept *paxosproto.Accept) {
 
 				select {
 				case r.ProposeChan <- inst.lb.clientProposals[i]:
-
+					break
 				default:
-
+					break
 				}
 			}
 			inst.lb.clientProposals = nil
@@ -548,9 +548,9 @@ func (r *Replica) handleCommit(commit *paxosproto.Commit) {
 			for i := 0; i < len(inst.lb.clientProposals); i++ {
 				select {
 				case r.ProposeChan <- inst.lb.clientProposals[i]:
-
+					break
 				default:
-
+					break
 				}
 
 			}
@@ -582,9 +582,9 @@ func (r *Replica) handleCommitShort(commit *paxosproto.CommitShort) {
 			for i := 0; i < len(inst.lb.clientProposals); i++ {
 				select {
 				case r.ProposeChan <- inst.lb.clientProposals[i]:
-
+					break
 				default:
-
+					break
 				}
 
 			}
@@ -619,9 +619,9 @@ func (r *Replica) handlePrepareReply(preply *paxosproto.PrepareReply) {
 				for i := 0; i < len(inst.lb.clientProposals); i++ {
 					select {
 					case r.ProposeChan <- inst.lb.clientProposals[i]:
-
+						break
 					default:
-
+						break
 					}
 
 				}
@@ -652,9 +652,9 @@ func (r *Replica) handlePrepareReply(preply *paxosproto.PrepareReply) {
 
 					select {
 					case r.ProposeChan <- inst.lb.clientProposals[i]:
-
+						break
 					default:
-
+						break
 					}
 				}
 				inst.lb.clientProposals = nil
