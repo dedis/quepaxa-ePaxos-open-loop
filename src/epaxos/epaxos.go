@@ -827,9 +827,9 @@ func (r *Replica) handlePropose(propose *genericsmr.Propose) {
 	} else {
 		select {
 		case r.ProposeChan <- propose:
-
+			break
 		default:
-
+			break
 		}
 
 		//fmt.Printf("pushed back proposal\n")
@@ -1285,9 +1285,9 @@ func (r *Replica) handleCommit(commit *epaxosproto.Commit) {
 			for _, p := range inst.lb.clientProposals {
 				select {
 				case r.ProposeChan <- p:
-
+					break
 				default:
-
+					break
 				}
 
 			}
@@ -1338,9 +1338,9 @@ func (r *Replica) handleCommitShort(commit *epaxosproto.CommitShort) {
 			for _, p := range inst.lb.clientProposals {
 				select {
 				case r.ProposeChan <- p:
-
+					break
 				default:
-
+					break
 				}
 			}
 			inst.lb = nil
