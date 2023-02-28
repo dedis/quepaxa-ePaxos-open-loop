@@ -178,7 +178,7 @@ func (c *Client) failureDetector() {
 			}
 			if c.leader != reply.LeaderId {
 				c.leader = reply.LeaderId
-				fmt.Printf("changed the leader to %v", c.leader)
+				//fmt.Printf("changed the leader to %v", c.leader)
 			}
 			time.Sleep(time.Duration(*leaderTimeout) * time.Microsecond)
 		}
