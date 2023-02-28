@@ -22,8 +22,6 @@ const FALSE = uint8(0)
 const DS = 5
 const ADAPT_TIME_SEC = 10
 
-const COMMIT_GRACE_PERIOD = 10 * 1e9 //10 seconds
-
 const BF_K = 4
 const BF_M_N = 32.0
 
@@ -75,6 +73,7 @@ type Replica struct {
 	batchSize             int
 	batchTime             int
 	pipe                  int
+	COMMIT_GRACE_PERIOD   uint64
 }
 
 type Instance struct {
@@ -119,7 +118,7 @@ type LeaderBookkeeping struct {
 	tpaOKs            int
 }
 
-func NewReplica(id int, peerAddrList []string, thrifty bool, exec bool, dreply bool, beacon bool, durable bool, batchSize int, batchTime int, pipe int) *Replica {
+func NewReplica(id int, peerAddrList []string, thrifty bool, exec bool, dreply bool, beacon bool, durable bool, batchSize int, batchTime int, pipe int, COMMIT_GRACE_PERIOD uint64) *Replica {
 	r := &Replica{
 		genericsmr.NewReplica(id, peerAddrList, thrifty, exec, dreply),
 		make(chan fastrpc.Serializable, genericsmr.CHAN_BUFFER_SIZE),
@@ -148,7 +147,8 @@ func NewReplica(id int, peerAddrList []string, thrifty bool, exec bool, dreply b
 		make(chan *instanceId, genericsmr.CHAN_BUFFER_SIZE),
 		batchSize,
 		batchTime,
-		pipe}
+		pipe,
+		COMMIT_GRACE_PERIOD}
 
 	r.Beacon = beacon
 	r.Durable = durable
@@ -449,7 +449,7 @@ func (r *Replica) executeCommands() {
 				if r.InstanceSpace[q][inst] == nil || r.InstanceSpace[q][inst].Status != epaxosproto.COMMITTED {
 					if inst == problemInstance[q] {
 						timeout[q] += SLEEP_TIME_NS
-						if timeout[q] >= COMMIT_GRACE_PERIOD {
+						if timeout[q] >= r.COMMIT_GRACE_PERIOD {
 							r.instancesToRecover <- &instanceId{int32(q), inst}
 							timeout[q] = 0
 						}

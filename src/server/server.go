@@ -31,6 +31,7 @@ var procs *int = flag.Int("p", 4, "GOMAXPROCS. Defaults to 2")
 var batchSize *int = flag.Int("batchSize", 1, "batch size")
 var batchTime *int = flag.Int("batchTime", 1, "batch time in micro seconds")
 var pipe *int = flag.Int("pipeline", 1, "pipeline length")
+var commit_grade_period *int = flag.Int("timeout", 300000000, "COMMIT GRACE PERIOD in micro seconds")
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 var thrifty = flag.Bool("thrifty", false, "Use only as many messages as strictly required for inter-replica communication.")
 var exec = flag.Bool("exec", false, "Execute commands.")
@@ -61,7 +62,7 @@ func main() {
 
 	if *doEpaxos {
 		log.Println("Starting Egalitarian Paxos replica...")
-		rep := epaxos.NewReplica(replicaId, nodeList, *thrifty, *exec, *dreply, *beacon, *durable, *batchSize, *batchTime, *pipe)
+		rep := epaxos.NewReplica(replicaId, nodeList, *thrifty, *exec, *dreply, *beacon, *durable, *batchSize, *batchTime, *pipe, uint64(*commit_grade_period)*1000)
 		rpc.Register(rep)
 	} else if *doMencius {
 		log.Println("Starting Mencius replica...")
