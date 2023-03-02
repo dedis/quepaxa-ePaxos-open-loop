@@ -336,8 +336,10 @@ func (c *Client) sendOneRequest(id int32) {
 func (c *Client) processOneReply(rep *genericsmrproto.ProposeReplyTS) {
 	if rep.CommandId >= 0 && int(rep.CommandId) < len(c.CommandLog) {
 		if c.CommandLog[rep.CommandId].Duration != time.Duration(0) {
-			panic("already received")
+			//panic("already received")
+			return
 		}
+
 		c.CommandLog[rep.CommandId].ReceiveTime = time.Now()
 		c.CommandLog[rep.CommandId].Duration = c.CommandLog[rep.CommandId].ReceiveTime.Sub(c.CommandLog[rep.CommandId].SendTime)
 		c.ReceivedSoFar += 1
