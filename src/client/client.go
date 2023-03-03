@@ -174,7 +174,7 @@ func (c *Client) failureDetector() {
 		for true {
 			reply := new(masterproto.GetLeaderReply)
 			if err := c.master.Call("Master.GetLeader", new(masterproto.GetLeaderArgs), reply); err != nil {
-				log.Fatalf("Error making the GetLeader RPC\n")
+				//log.Fatalf("Error making the GetLeader RPC\n")
 			}
 			if c.leader != reply.LeaderId {
 				c.leader = reply.LeaderId
