@@ -20,6 +20,8 @@ import (
 	"github.com/montanaflynn/stats"
 )
 
+const CLIENT_TIMEOUT = 2000000 // client side timeout in seconds
+
 /*
 	input variables
 */
@@ -375,22 +377,28 @@ func (c *Client) writeToLog() {
 	var latencyList []int64 // contains the time duration spent for each successful request in micro seconds
 	noResponses := 0        // number of requests for which no response was received
 	totalRequests := 0      // total number of requests sent
+	responses := 0          // number of responses
 
 	for i := 0; i < len(c.CommandLog); i++ {
 		if c.CommandLog[i].Sent == true { // if this slot was used before
 			if c.CommandLog[i].Duration != 0 { // if we got a response
 				latencyList = c.addValueNToArrayMTimes(latencyList, c.CommandLog[i].Duration.Microseconds(), 1)
 				c.printRequest(i, c.CommandLog[i].SendTime.Sub(c.startTime).Microseconds(), c.CommandLog[i].ReceiveTime.Sub(c.startTime).Microseconds(), f)
+				responses++
 			} else { // no response
-				noResponses += 1
+				latencyList = c.addValueNToArrayMTimes(latencyList, CLIENT_TIMEOUT, 1)
+				c.printRequest(i, c.CommandLog[i].SendTime.Sub(c.startTime).Microseconds(), c.CommandLog[i].SendTime.Sub(c.startTime).Microseconds()+CLIENT_TIMEOUT, f)
+				noResponses++
 			}
-			totalRequests += 1
+			totalRequests++
 		}
 	}
-
+	if (responses + noResponses) != totalRequests {
+		panic("should not happen")
+	}
 	medianLatency, _ := stats.Median(c.getFloat64List(latencyList))
 	percentile99, _ := stats.Percentile(c.getFloat64List(latencyList), 99.0) // tail latency
-	throughput := float64(len(latencyList)) / float64(*testDuration)
+	throughput := float64(responses) / float64(*testDuration)
 	errorRate := (noResponses) * 100 / totalRequests
 
 	fmt.Printf("Throughput (successfully committed requests) := %v requests per second   \n", throughput)
