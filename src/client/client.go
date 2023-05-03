@@ -37,6 +37,7 @@ var clientBatchSize *int = flag.Int("clientBatchSize", 50, "client batch size")
 var testDuration *int = flag.Int("testDuration", 60, "test duration in seconds")
 var leaderTimeout *int = flag.Int("leaderTimeout", 20000, "leader timeout in micro seconds")
 var defaultReplica *int = flag.Int("defaultReplica", 0, "default replica for Epaxos")
+var window *int = flag.Int("window", 1000, "number of outstanding client batches")
 var logFilePath *string = flag.String("logFilePath", "logs/", "log file path")
 var name *string = flag.String("name", "4", "unique client name")
 
@@ -76,13 +77,14 @@ type Client struct {
 	name        string
 	logFilePath string
 	startTime   time.Time
+	window      int
 }
 
 /*
 	Initialize a EPaxos client
 */
 
-func ClientInit(arrivalRate int, logFilePath string, name string) *Client {
+func ClientInit(arrivalRate int, logFilePath string, name string, window int) *Client {
 	c := &Client{
 		CommandLog:      make([]CmdLog, 0),
 		SentSoFar:       0,
@@ -95,6 +97,7 @@ func ClientInit(arrivalRate int, logFilePath string, name string) *Client {
 		name:            name,
 		logFilePath:     logFilePath,
 		startTime:       time.Now(),
+		window:          window,
 	}
 
 	pid := os.Getpid()
@@ -204,8 +207,11 @@ func (c *Client) OpenLoopClient() {
 				_ = <-c.arrivalChan // keep collecting new requests arrivals
 				numRequests++
 			}
-			c.sendOneRequest(int32(id))
-			id = id + *clientBatchSize
+
+			if (c.SentSoFar - c.ReceivedSoFar) < c.window*(*clientBatchSize) {
+				c.sendOneRequest(int32(id))
+				id = id + *clientBatchSize
+			}
 		}
 	}()
 
@@ -433,7 +439,7 @@ func (c *Client) addValueNToArrayMTimes(list []int64, N int64, M int) []int64 {
 func main() {
 	flag.Parse()
 
-	client := ClientInit(*arrivalRate, *logFilePath, *name)
+	client := ClientInit(*arrivalRate, *logFilePath, *name, *window)
 
 	client.Prologue()
 	client.OpenLoopClient()
