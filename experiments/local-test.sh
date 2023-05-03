@@ -5,8 +5,8 @@ batchSize=$3
 batchTime=$4
 leaderTimeout=$5
 pipeline=$6
-leader=$7
-window=$8
+window=$7
+leader=$8
 
 server_path="bin/epaxos_server"
 ctl_path="bin/epaxos_client"
@@ -34,11 +34,11 @@ sleep 10
  
 echo "Started master and 5 servers"
 
-nohup ./${ctl_path} -name 7   -maddr localhost -w 50  -c 50 -arrivalRate "${arrival}" -clientBatchSize 50 -testDuration 60 -defaultReplica 0 -logFilePath ${output_path}  "${leader}" -leaderTimeout "${leaderTimeout}" -window "${window}">${output_path}7.log  &
-nohup ./${ctl_path} -name 8   -maddr localhost -w 50  -c 50 -arrivalRate "${arrival}" -clientBatchSize 50 -testDuration 60 -defaultReplica 1 -logFilePath ${output_path}  "${leader}" -leaderTimeout "${leaderTimeout}" -window "${window}">${output_path}8.log  &
-nohup ./${ctl_path} -name 9   -maddr localhost -w 50  -c 50 -arrivalRate "${arrival}" -clientBatchSize 50 -testDuration 60 -defaultReplica 2 -logFilePath ${output_path}  "${leader}" -leaderTimeout "${leaderTimeout}" -window "${window}">${output_path}9.log  &
-nohup ./${ctl_path} -name 10  -maddr localhost -w 50  -c 50 -arrivalRate "${arrival}" -clientBatchSize 50 -testDuration 60 -defaultReplica 3 -logFilePath ${output_path}  "${leader}" -leaderTimeout "${leaderTimeout}" -window "${window}">${output_path}10.log &
-nohup ./${ctl_path} -name 11  -maddr localhost -w 50  -c 50 -arrivalRate "${arrival}" -clientBatchSize 50 -testDuration 60 -defaultReplica 4 -logFilePath ${output_path}  "${leader}" -leaderTimeout "${leaderTimeout}" -window "${window}">${output_path}11.log &
+nohup ./${ctl_path} -name 7   -maddr localhost -w 50  -c 2 -arrivalRate "${arrival}" -clientBatchSize 50 -testDuration 60 -defaultReplica 0 -logFilePath ${output_path}  "${leader}" -leaderTimeout "${leaderTimeout}" -window "${window}">${output_path}7.log  &
+nohup ./${ctl_path} -name 8   -maddr localhost -w 50  -c 2 -arrivalRate "${arrival}" -clientBatchSize 50 -testDuration 60 -defaultReplica 1 -logFilePath ${output_path}  "${leader}" -leaderTimeout "${leaderTimeout}" -window "${window}">${output_path}8.log  &
+nohup ./${ctl_path} -name 9   -maddr localhost -w 50  -c 2 -arrivalRate "${arrival}" -clientBatchSize 50 -testDuration 60 -defaultReplica 2 -logFilePath ${output_path}  "${leader}" -leaderTimeout "${leaderTimeout}" -window "${window}">${output_path}9.log  &
+nohup ./${ctl_path} -name 10  -maddr localhost -w 50  -c 2 -arrivalRate "${arrival}" -clientBatchSize 50 -testDuration 60 -defaultReplica 3 -logFilePath ${output_path}  "${leader}" -leaderTimeout "${leaderTimeout}" -window "${window}">${output_path}10.log &
+nohup ./${ctl_path} -name 11  -maddr localhost -w 50  -c 2 -arrivalRate "${arrival}" -clientBatchSize 50 -testDuration 60 -defaultReplica 4 -logFilePath ${output_path}  "${leader}" -leaderTimeout "${leaderTimeout}" -window "${window}">${output_path}11.log &
 
 sleep 130
 
