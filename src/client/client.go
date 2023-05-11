@@ -100,7 +100,7 @@ func ClientInit(arrivalRate int, logFilePath string, name string, window int) *C
 		logFilePath:     logFilePath,
 		startTime:       time.Now(),
 		window:          window,
-		receivedCnMutex: &sync.Mutex{}
+		receivedCnMutex: &sync.Mutex{},
 	}
 
 	pid := os.Getpid()
@@ -215,7 +215,7 @@ func (c *Client) OpenLoopClient() {
 				c.receivedCnMutex.Unlock()
 				c.sendOneRequest(int32(id))
 				id = id + *clientBatchSize
-			}else{
+			} else {
 				c.receivedCnMutex.Unlock()
 			}
 		}
