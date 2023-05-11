@@ -215,6 +215,8 @@ func (c *Client) OpenLoopClient() {
 				c.receivedCnMutex.Unlock()
 				c.sendOneRequest(int32(id))
 				id = id + *clientBatchSize
+			}else{
+				c.receivedCnMutex.Unlock()
 			}
 		}
 	}()
