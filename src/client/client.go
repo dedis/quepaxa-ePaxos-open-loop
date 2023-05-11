@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"state"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/montanaflynn/stats"
@@ -74,10 +75,11 @@ type Client struct {
 	leader     int         // current leader index
 	receivChan chan *genericsmrproto.ProposeReplyTS
 
-	name        string
-	logFilePath string
-	startTime   time.Time
-	window      int
+	name            string
+	logFilePath     string
+	startTime       time.Time
+	window          int
+	receivedCnMutex *sync.Mutex
 }
 
 /*
@@ -98,6 +100,7 @@ func ClientInit(arrivalRate int, logFilePath string, name string, window int) *C
 		logFilePath:     logFilePath,
 		startTime:       time.Now(),
 		window:          window,
+		receivedCnMutex: &sync.Mutex{}
 	}
 
 	pid := os.Getpid()
@@ -207,8 +210,9 @@ func (c *Client) OpenLoopClient() {
 				_ = <-c.arrivalChan // keep collecting new requests arrivals
 				numRequests++
 			}
-
+			c.receivedCnMutex.Lock()
 			if (c.SentSoFar - c.ReceivedSoFar) < c.window*(*clientBatchSize) {
+				c.receivedCnMutex.Unlock()
 				c.sendOneRequest(int32(id))
 				id = id + *clientBatchSize
 			}
@@ -350,7 +354,9 @@ func (c *Client) processOneReply(rep *genericsmrproto.ProposeReplyTS) {
 
 		c.CommandLog[rep.CommandId].ReceiveTime = time.Now()
 		c.CommandLog[rep.CommandId].Duration = c.CommandLog[rep.CommandId].ReceiveTime.Sub(c.CommandLog[rep.CommandId].SendTime)
+		c.receivedCnMutex.Lock()
 		c.ReceivedSoFar += 1
+		c.receivedCnMutex.Unlock()
 		// fmt.Print(fmt.Sprintf("$v", rep), "\n")
 	}
 }
