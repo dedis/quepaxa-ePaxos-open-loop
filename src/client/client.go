@@ -21,7 +21,7 @@ import (
 	"github.com/montanaflynn/stats"
 )
 
-const CLIENT_TIMEOUT = 2000000 // client side timeout in seconds
+const CLIENT_TIMEOUT = 2000000 // client side timeout in micro seconds
 
 /*
 	input variables
@@ -33,7 +33,7 @@ var writes *int = flag.Int("w", 100, "Percentage of updates (writes). Defaults t
 var leader *bool = flag.Bool("l", false, "EPaxos (no leader: false). Paxos: true.")
 var procs *int = flag.Int("p", 8, "GOMAXPROCS. Defaults to 2")
 var conflicts *int = flag.Int("c", 0, "Percentage of conflicts. Defaults to 0%")
-var arrivalRate *int = flag.Int("arrivalRate", 1000, "Arrival Rate in requests per second. Defaults to 1000")
+var arrivalRate *int = flag.Int("arrivalRate", 1000, "Arrival Rate in requests per second")
 var clientBatchSize *int = flag.Int("clientBatchSize", 50, "client batch size")
 var testDuration *int = flag.Int("testDuration", 60, "test duration in seconds")
 var leaderTimeout *int = flag.Int("leaderTimeout", 20000, "leader timeout in micro seconds")
@@ -194,7 +194,7 @@ func (c *Client) failureDetector() {
 }
 
 /*
-	The main body of an open-loop client.
+	The main body of an open-loop client with back pressure
 */
 
 func (c *Client) OpenLoopClient() {
@@ -206,7 +206,7 @@ func (c *Client) OpenLoopClient() {
 		id := 0 // request number
 		for true {
 			numRequests := 0
-			for !(numRequests == *clientBatchSize) {
+			for !(numRequests >= *clientBatchSize) {
 				_ = <-c.arrivalChan // keep collecting new requests arrivals
 				numRequests++
 			}
@@ -388,7 +388,7 @@ func (c *Client) writeToLog() {
 	}
 	defer f.Close()
 
-	var latencyList []int64 // contains the time duration spent for each successful request in micro seconds
+	var latencyList []int64 // contains the time duration spent for each request in micro seconds
 	noResponses := 0        // number of requests for which no response was received
 	totalRequests := 0      // total number of requests sent
 	responses := 0          // number of responses
@@ -396,9 +396,15 @@ func (c *Client) writeToLog() {
 	for i := 0; i < len(c.CommandLog); i++ {
 		if c.CommandLog[i].Sent == true { // if this slot was used before
 			if c.CommandLog[i].Duration != 0 { // if we got a response
-				latencyList = c.addValueNToArrayMTimes(latencyList, c.CommandLog[i].Duration.Microseconds(), 1)
-				c.printRequest(i, c.CommandLog[i].SendTime.Sub(c.startTime).Microseconds(), c.CommandLog[i].ReceiveTime.Sub(c.startTime).Microseconds(), f)
-				responses++
+				if c.CommandLog[i].Duration.Microseconds() < CLIENT_TIMEOUT {
+					latencyList = c.addValueNToArrayMTimes(latencyList, c.CommandLog[i].Duration.Microseconds(), 1)
+					c.printRequest(i, c.CommandLog[i].SendTime.Sub(c.startTime).Microseconds(), c.CommandLog[i].ReceiveTime.Sub(c.startTime).Microseconds(), f)
+					responses++
+				} else {
+					latencyList = c.addValueNToArrayMTimes(latencyList, CLIENT_TIMEOUT, 1)
+					c.printRequest(i, c.CommandLog[i].SendTime.Sub(c.startTime).Microseconds(), c.CommandLog[i].SendTime.Sub(c.startTime).Microseconds()+CLIENT_TIMEOUT, f)
+					noResponses++
+				}
 			} else { // no response
 				latencyList = c.addValueNToArrayMTimes(latencyList, CLIENT_TIMEOUT, 1)
 				c.printRequest(i, c.CommandLog[i].SendTime.Sub(c.startTime).Microseconds(), c.CommandLog[i].SendTime.Sub(c.startTime).Microseconds()+CLIENT_TIMEOUT, f)
@@ -407,13 +413,11 @@ func (c *Client) writeToLog() {
 			totalRequests++
 		}
 	}
-	if (responses + noResponses) != totalRequests {
-		panic("should not happen")
-	}
+
 	medianLatency, _ := stats.Median(c.getFloat64List(latencyList))
 	percentile99, _ := stats.Percentile(c.getFloat64List(latencyList), 99.0) // tail latency
 	throughput := float64(responses) / float64(*testDuration)
-	errorRate := (noResponses) * 100 / totalRequests
+	errorRate := (totalRequests - responses) * 100 / totalRequests
 
 	fmt.Printf("Throughput (successfully committed requests) := %v requests per second   \n", throughput)
 	fmt.Printf("Median Latency := %v micro seconds per request  \n", medianLatency)
