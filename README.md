@@ -1,3 +1,5 @@
+# EPaxos and Multi-Paxos
+
 This repository implements Paxos and EPaxos with configurable batching and pipelining
 
 This repository is a fork from ```https://github.com/efficient/epaxos```. All rights belong to the original authors of EPaxos
@@ -21,3 +23,5 @@ mv client /home/username/epaxos/bin/epaxos_client
 cd ../..
 GO111MODULE=on
 ```
+
+This repository was done as part of the [QuePaxa](https://github.com/dedis/quepaxa/) project, which is accepted in the SOSP 2023 conference.
